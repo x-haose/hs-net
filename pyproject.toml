@@ -66,6 +66,7 @@ skips = [
 
 [dependency-groups]
 dev = [
+    "bandit[toml]>=1.7",
     "pre-commit>=4.2",
     "twine>=6.1",
     "ruff>=0.6",
