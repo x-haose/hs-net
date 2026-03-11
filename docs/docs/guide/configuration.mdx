@@ -1,0 +1,142 @@
+# 配置
+
+hs-net 提供灵活的配置方式，支持全局配置、构造函数参数和请求级参数三级覆盖。
+
+## NetConfig
+
+`NetConfig` 是全局配置类，所有选项都有合理的默认值：
+
+```python title="config.py"
+from hs_net import NetConfig, EngineEnum
+
+config = NetConfig(
+    engine=EngineEnum.HTTPX,    # HTTP 引擎
+    base_url="",                # 基础 URL
+    timeout=20.0,               # 超时时间（秒）
+    retries=3,                  # 重试次数
+    retry_delay=0.0,            # 重试间隔（秒）
+    user_agent="random",        # User-Agent
+    proxy=None,                 # 代理地址
+    verify=True,                # SSL 证书验证
+    raise_status=True,          # 非 2xx 是否抛异常
+    allow_redirects=True,       # 是否跟随重定向
+    concurrency=None,           # 最大并发数
+    headers={},                 # 全局请求头
+    cookies={},                 # 全局 cookies
+    engine_options={},          # 引擎特定配置
+)
+```
+
+## 配置选项详解
+
+### engine
+
+指定 HTTP 引擎，支持字符串或枚举：
+
+```python
+# 字符串
+net = SyncNet(engine="curl_cffi")
+
+# 枚举
+net = SyncNet(engine=EngineEnum.CURL_CFFI)
+
+# 自定义引擎类
+net = SyncNet(engine=MyCustomEngine)
+```
+
+### base_url
+
+设置基础 URL，请求时自动拼接路径：
+
+```python title="base_url.py"
+net = SyncNet(base_url="https://api.example.com/v1")
+
+# 以下两种写法等价：
+net.get("/users")       # => https://api.example.com/v1/users
+net.get("users")        # => https://api.example.com/v1/users
+
+# 绝对 URL 不受 base_url 影响
+net.get("https://other.com/path")  # => https://other.com/path
+```
+
+### user_agent
+
+支持快捷方式和自定义字符串：
+
+```python
+net = SyncNet(user_agent="random")     # 每次请求随机 UA
+net = SyncNet(user_agent="chrome")     # Chrome UA
+net = SyncNet(user_agent="firefox")    # Firefox UA
+net = SyncNet(user_agent="safari")     # Safari UA
+net = SyncNet(user_agent="edge")       # Edge UA
+net = SyncNet(user_agent="MyBot/1.0") # 自定义 UA
+```
+
+### verify
+
+是否验证 SSL 证书：
+
+```python
+net = SyncNet(verify=False)  # 跳过 SSL 验证（开发/测试环境）
+```
+
+### concurrency
+
+限制最大并发数（异步场景下特别有用）：
+
+```python title="concurrency.py"
+# 最多同时 10 个请求
+async with Net(concurrency=10) as net:
+    tasks = [net.get(url) for url in urls]
+    results = await asyncio.gather(*tasks)
+```
+
+### engine_options
+
+透传给底层引擎的配置：
+
+```python title="engine_options.py"
+# httpx: 关闭 HTTP/2
+net = SyncNet(engine="httpx", engine_options={"http2": False})
+
+# curl_cffi: 自定义浏览器指纹
+net = SyncNet(engine="curl_cffi", engine_options={
+    "impersonate": "chrome120",
+})
+```
+
+## 三级配置覆盖
+
+```python title="override.py"
+from hs_net import NetConfig, SyncNet
+
+# 第 1 级：NetConfig 全局默认
+config = NetConfig(timeout=30, retries=5, user_agent="chrome")
+
+# 第 2 级：构造函数覆盖
+with SyncNet(config=config, timeout=15) as net:
+    # timeout=15（构造函数覆盖了 config 的 30）
+    # retries=5（继承 config）
+    # user_agent="chrome"（继承 config）
+
+    # 第 3 级：请求级覆盖
+    resp = net.get("https://example.com", timeout=5)
+    # timeout=5（请求级覆盖了构造函数的 15）
+```
+
+## headers 和 cookies 合并
+
+headers 和 cookies 采用**合并**而非覆盖策略：
+
+```python title="merge.py"
+config = NetConfig(headers={"X-Global": "1"})
+
+with SyncNet(config=config, headers={"X-Instance": "2"}) as net:
+    resp = net.get("https://example.com", headers={"X-Request": "3"})
+    # 实际 headers 包含:
+    # X-Global: 1（来自 config）
+    # X-Instance: 2（来自构造函数）
+    # X-Request: 3（来自请求参数）
+```
+
+同名 key 以更高优先级的值为准。

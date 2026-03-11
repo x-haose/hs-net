@@ -1,0 +1,138 @@
+# 高级用法
+
+## base_url 拼接
+
+设置 `base_url` 后，请求路径会自动拼接：
+
+```python title="base_url.py"
+async with Net(base_url="https://api.example.com/v1") as api:
+    # 以下请求都发往 https://api.example.com/v1/users
+    await api.get("/users")
+    await api.get("users")
+
+    # 绝对 URL 不受影响
+    await api.get("https://other.com/path")
+```
+
+## 并发控制
+
+`concurrency` 参数限制同时进行的请求数：
+
+```python title="concurrency.py"
+import asyncio
+
+async def main():
+    # 最多同时 5 个请求
+    async with Net(concurrency=5) as net:
+        urls = [f"https://example.com/?p={i}" for i in range(100)]
+        tasks = [net.get(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        print(f"完成 {len(results)} 个请求")
+```
+
+:::tip 同步并发
+SyncNet 也支持 `concurrency`，使用线程信号量控制。
+配合 `concurrent.futures.ThreadPoolExecutor` 使用效果更佳。
+:::
+
+## 重试配置
+
+```python title="retry.py"
+# 全局配置：重试 5 次，每次间隔 1 秒
+net = SyncNet(retries=5, retry_delay=1.0)
+
+# 单次请求覆盖：这次请求不重试
+resp = net.get("https://example.com", retries=0)
+
+# 单次请求覆盖：这次请求重试 10 次
+resp = net.get("https://example.com", retries=10, retry_delay=2.0)
+```
+
+:::info 重试策略
+重试间隔 = `retry_delay` + 随机抖动（0.1~1 秒）
+
+随机抖动可以避免多个请求同时重试（惊群效应）。
+:::
+
+## Cookie 管理
+
+hs-net 自动管理会话级 Cookie：
+
+```python title="cookies.py"
+with SyncNet(cookies={"init_token": "abc"}) as net:
+    # 初始 Cookie 会随每次请求发送
+    resp = net.get("https://httpbin.org/cookies")
+
+    # 查看当前会话所有 Cookie
+    print(net.cookies)
+
+    # 请求级 Cookie（与会话 Cookie 合并）
+    resp = net.get("https://httpbin.org/cookies", cookies={"extra": "value"})
+```
+
+## SSL 证书
+
+```python title="ssl.py"
+# 跳过 SSL 验证（开发环境）
+net = SyncNet(verify=False)
+
+# 单次请求跳过
+resp = net.get("https://self-signed.example.com", verify=False)
+```
+
+## 完整的 API 客户端示例
+
+```python title="api_client.py"
+import asyncio
+from hs_net import Net, NetConfig, RetryExhausted
+
+class UserAPI:
+    """用户 API 客户端。"""
+
+    def __init__(self, token: str):
+        config = NetConfig(
+            base_url="https://api.example.com/v1",
+            retries=3,
+            retry_delay=0.5,
+            user_agent="MyApp/1.0",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+            },
+        )
+        self._net = Net(config=config)
+
+    async def close(self):
+        await self._net.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        await self.close()
+
+    async def list_users(self, page: int = 1):
+        resp = await self._net.get("/users", params={"page": str(page)})
+        return resp.jmespath("data[*]")
+
+    async def get_user(self, user_id: int):
+        resp = await self._net.get(f"/users/{user_id}")
+        return resp.jmespath("data")
+
+    async def create_user(self, name: str, email: str):
+        resp = await self._net.post("/users", json_data={
+            "name": name,
+            "email": email,
+        })
+        return resp.jmespath("data")
+
+async def main():
+    async with UserAPI(token="my-secret-token") as api:
+        users = await api.list_users()
+        print(f"用户列表: {users}")
+
+        user = await api.get_user(1)
+        print(f"用户详情: {user}")
+
+asyncio.run(main())
+```

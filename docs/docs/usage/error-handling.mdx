@@ -1,0 +1,95 @@
+# 错误处理
+
+## 异常层级
+
+hs-net 的所有异常都继承自 `RequestException`：
+
+```
+RequestException            # 基类
+├── StatusException          # HTTP 状态码非 2xx
+├── TimeoutException         # 请求超时
+├── ConnectionException      # 连接失败（DNS、SSL 等）
+└── RetryExhausted           # 重试耗尽
+```
+
+## StatusException
+
+当 `raise_status=True`（默认）且响应状态码非 2xx 时抛出：
+
+```python title="status.py"
+from hs_net import SyncNet, StatusException
+
+with SyncNet() as net:
+    try:
+        resp = net.get("https://httpbin.org/status/404")
+    except StatusException as e:
+        print(f"状态码: {e.code}")   # 404
+        print(f"URL: {e.url}")      # https://httpbin.org/status/404
+```
+
+### 关闭自动异常
+
+```python title="no_raise.py"
+# 全局关闭
+with SyncNet(raise_status=False) as net:
+    resp = net.get("https://httpbin.org/status/404")
+    if not resp.ok:
+        print(f"请求失败: {resp.status_code}")
+
+# 单次请求关闭
+with SyncNet() as net:
+    resp = net.get("https://httpbin.org/status/404", raise_status=False)
+```
+
+## RetryExhausted
+
+当所有重试都失败后抛出：
+
+```python title="retry_exhausted.py"
+from hs_net import SyncNet, RetryExhausted
+
+with SyncNet(retries=3) as net:
+    try:
+        resp = net.get("https://httpbin.org/status/500")
+    except RetryExhausted as e:
+        print(f"尝试次数: {e.attempts}")              # 3
+        print(f"最后异常: {e.last_exception}")         # StatusException
+        print(f"URL: {e.url}")                         # https://httpbin.org/status/500
+```
+
+## TimeoutException & ConnectionException
+
+:::info 当前版本
+这两个异常类已定义，但引擎暂未自动转换底层库异常。你可以在中间件中手动捕获和转换。
+:::
+
+```python title="timeout.py"
+from hs_net import TimeoutException, ConnectionException
+
+try:
+    resp = net.get("https://example.com", timeout=0.001)
+except TimeoutException as e:
+    print(f"超时: {e.timeout}s")
+```
+
+## 统一捕获
+
+使用基类 `RequestException` 捕获所有 hs-net 异常：
+
+```python title="catch_all.py"
+from hs_net import SyncNet, RequestException
+
+with SyncNet() as net:
+    try:
+        resp = net.get("https://example.com")
+    except RequestException as e:
+        print(f"请求异常: {e}")
+```
+
+## 向后兼容
+
+`RequestStatusException` 是 `StatusException` 的别名，旧代码无需修改：
+
+```python
+from hs_net import RequestStatusException  # 等同于 StatusException
+```

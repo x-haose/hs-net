@@ -1,0 +1,190 @@
+# 数据选择器
+
+hs-net 的 `Response` 对象内置四种数据提取方式，覆盖 HTML 和 JSON 两种场景。
+
+## CSS 选择器
+
+基于 [parsel](https://github.com/scrapy/parsel) 库，语法与浏览器开发者工具一致。
+
+```python title="css.py"
+resp = net.get("https://example.com")
+
+# 获取文本内容
+title = resp.css("title::text").get()
+# => "Example Domain"
+
+# 获取属性值
+href = resp.css("a::attr(href)").get()
+# => "https://www.iana.org/domains/example"
+
+# 获取所有匹配项
+items = resp.css("li.item::text").getall()
+# => ["项目1", "项目2", "项目3"]
+
+# 无匹配时的默认值
+result = resp.css("div.none::text").get(default="未找到")
+# => "未找到"
+```
+
+### 常用 CSS 选择器语法
+
+| 选择器 | 说明 | 示例 |
+|--------|------|------|
+| `tag` | 标签名 | `div`, `a`, `p` |
+| `.class` | 类名 | `.title`, `.item` |
+| `#id` | ID | `#main`, `#header` |
+| `tag::text` | 文本内容 | `h1::text` |
+| `tag::attr(name)` | 属性值 | `a::attr(href)` |
+| `parent > child` | 直接子元素 | `ul > li` |
+| `parent child` | 后代元素 | `div a` |
+| `[attr=val]` | 属性选择 | `input[type=text]` |
+
+### 链式选择
+
+```python title="css_chain.py"
+# 先选中容器，再在容器内继续选择
+for item in resp.css("div.product"):
+    name = item.css("h3::text").get()
+    price = item.css(".price::text").get()
+    link = item.css("a::attr(href)").get()
+    print(f"{name}: {price} -> {link}")
+```
+
+## XPath
+
+XPath 提供更强大的查询能力，适合复杂的 HTML 结构。
+
+```python title="xpath.py"
+resp = net.get("https://example.com")
+
+# 获取文本
+title = resp.xpath("//title/text()").get()
+
+# 获取属性
+href = resp.xpath("//a/@href").get()
+
+# 条件选择
+items = resp.xpath("//div[@class='item']/text()").getall()
+
+# 位置选择
+first = resp.xpath("//ul/li[1]/text()").get()
+last = resp.xpath("//ul/li[last()]/text()").get()
+```
+
+## 正则表达式
+
+直接在响应文本上执行正则匹配。
+
+```python title="regex.py"
+resp = net.get("https://example.com")
+
+# 匹配所有结果
+prices = resp.re(r"价格: (\d+)元")
+# => ["99", "199", "299"]
+
+# 匹配第一个结果
+price = resp.re_first(r"价格: (\d+)元")
+# => "99"
+
+# 无匹配时的默认值
+result = resp.re_first(r"不存在的模式 (\d+)", default="N/A")
+# => "N/A"
+```
+
+## JMESPath（JSON 查询）
+
+对 JSON 响应执行结构化查询，基于 [jmespath](https://jmespath.org/) 库。
+
+:::tip 适用场景
+当 `resp.json_data` 不为 None 时可用。特别适合 REST API 响应的数据提取。
+:::
+
+### 基本查询
+
+```python title="jmespath_basic.py"
+resp = net.get("https://api.example.com/users")
+# 假设返回:
+# {
+#   "data": [
+#     {"name": "Alice", "age": 25, "role": "admin"},
+#     {"name": "Bob", "age": 17, "role": "user"},
+#     {"name": "Charlie", "age": 30, "role": "admin"}
+#   ],
+#   "total": 3
+# }
+
+# 简单取值
+resp.jmespath("total")             # => 3
+
+# 嵌套取值
+resp.jmespath("data[0].name")      # => "Alice"
+
+# 获取所有名字
+resp.jmespath("data[*].name")      # => ["Alice", "Bob", "Charlie"]
+```
+
+### 条件过滤
+
+```python title="jmespath_filter.py"
+# 筛选成年用户
+resp.jmespath("data[?age > `18`].name")
+# => ["Alice", "Charlie"]
+
+# 筛选管理员
+resp.jmespath("data[?role == `admin`].name")
+# => ["Alice", "Charlie"]
+
+# 多条件
+resp.jmespath("data[?age > `18` && role == `admin`].name")
+# => ["Alice", "Charlie"]
+```
+
+### 多字段选择
+
+```python title="jmespath_multi.py"
+# 选择多个字段
+resp.jmespath("data[*].[name, age]")
+# => [["Alice", 25], ["Bob", 17], ["Charlie", 30]]
+
+# 重命名字段
+resp.jmespath("data[0].{user_name: name, user_age: age}")
+# => {"user_name": "Alice", "user_age": 25}
+```
+
+### 安全访问
+
+```python title="jmespath_safe.py"
+# json_data 为 None 时返回 None，不会报错
+resp.jmespath("any.path")  # => None
+
+# 不存在的路径返回 None
+resp.jmespath("nonexistent.field")  # => None
+```
+
+## URL 转换
+
+将相对路径转为绝对路径：
+
+```python title="to_url.py"
+resp = net.get("https://example.com/page")
+
+# 单个 URL
+resp.to_url("/other")
+# => ["https://example.com/other"]
+
+# 多个 URL
+resp.to_url(["/a", "/b", "/c"])
+# => ["https://example.com/a", "https://example.com/b", "https://example.com/c"]
+
+# 已是绝对路径的会被过滤
+resp.to_url(["https://other.com/page", "/local"])
+# => ["https://example.com/local"]
+```
+
+### 配合选择器使用
+
+```python title="selector_url.py"
+# 提取页面中的所有链接并转为绝对路径
+hrefs = resp.css("a::attr(href)").getall()
+absolute_urls = resp.to_url(hrefs)
+```

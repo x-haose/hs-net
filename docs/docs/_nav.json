@@ -1,0 +1,17 @@
+[
+  {
+    "text": "指南",
+    "link": "/guide/introduction",
+    "activeMatch": "/guide/"
+  },
+  {
+    "text": "使用教程",
+    "link": "/usage/basic-request",
+    "activeMatch": "/usage/"
+  },
+  {
+    "text": "API 参考",
+    "link": "/api/net",
+    "activeMatch": "/api/"
+  }
+]

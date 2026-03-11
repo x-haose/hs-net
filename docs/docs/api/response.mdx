@@ -1,0 +1,117 @@
+# Response
+
+统一的 HTTP 响应对象，内置选择器解析能力。
+
+## 属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `url` | `str` | 最终响应 URL（重定向后） |
+| `status_code` | `int` | HTTP 状态码 |
+| `ok` | `bool` | 状态码是否在 2xx 范围 |
+| `headers` | `dict[str, Any]` | 响应头 |
+| `cookies` | `dict[str, str]` | 本次响应的 cookies |
+| `client_cookies` | `dict[str, str]` | 会话级 cookies |
+| `content` | `bytes` | 响应体原始字节 |
+| `text` | `str` | 响应体文本 |
+| `json_data` | `dict \| list \| None` | JSON 数据（解析失败为 None） |
+| `request_data` | `RequestModel` | 原始请求信息 |
+| `domain` | `str` | 域名（含协议），如 `https://example.com` |
+| `host` | `str` | 主机名，如 `example.com` |
+
+## 选择器方法
+
+### css
+
+```python
+def css(query: str) -> SelectorList
+```
+
+执行 CSS 选择器查询。
+
+```python
+resp.css("title::text").get()          # 第一个匹配
+resp.css("li::text").getall()          # 所有匹配
+resp.css("a::attr(href)").get()        # 属性值
+resp.css("div.none::text").get("默认")  # 默认值
+```
+
+### xpath
+
+```python
+def xpath(query: str) -> SelectorList
+```
+
+执行 XPath 查询。
+
+```python
+resp.xpath("//title/text()").get()
+resp.xpath("//a/@href").getall()
+resp.xpath("//div[@class='item']/text()").get()
+```
+
+### re
+
+```python
+def re(regex: str, replace_entities: bool = True) -> list[str]
+```
+
+正则匹配，返回所有匹配组。
+
+```python
+resp.re(r"价格: (\d+)元")  # => ["99", "199"]
+```
+
+### re_first
+
+```python
+def re_first(regex: str, default=None, replace_entities: bool = True) -> str | None
+```
+
+正则匹配，返回第一个结果。
+
+```python
+resp.re_first(r"价格: (\d+)元")               # => "99"
+resp.re_first(r"不存在 (\d+)", default="N/A")  # => "N/A"
+```
+
+### jmespath
+
+```python
+def jmespath(expression: str) -> Any
+```
+
+对 JSON 响应执行 JMESPath 查询。`json_data` 为 None 时返回 None。
+
+```python
+resp.jmespath("data[0].name")              # 嵌套取值
+resp.jmespath("data[*].name")              # 通配符
+resp.jmespath("data[?age > `18`].name")    # 条件过滤
+resp.jmespath("data[*].[name, age]")       # 多字段
+```
+
+### to_url
+
+```python
+def to_url(urls: list[str] | str) -> list[str]
+```
+
+将相对路径转为绝对路径。已是 `http` 开头的会被过滤。
+
+```python
+resp.to_url("/page")                       # => ["https://example.com/page"]
+resp.to_url(["/a", "https://other.com"])   # => ["https://example.com/a"]
+```
+
+## SelectorList 方法
+
+`css()` 和 `xpath()` 返回的 `SelectorList` 对象：
+
+| 方法 | 说明 |
+|------|------|
+| `.get(default=None)` | 获取第一个结果 |
+| `.getall()` | 获取所有结果 |
+| `.re(regex)` | 正则匹配 |
+| `.re_first(regex)` | 正则匹配第一个 |
+| `.css(query)` | 链式 CSS 选择 |
+| `.xpath(query)` | 链式 XPath 选择 |

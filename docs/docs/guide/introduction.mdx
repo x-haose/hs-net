@@ -1,0 +1,61 @@
+# 介绍
+
+**hs-net** 是一个统一多引擎的增强型 HTTP 客户端库，为 Python 开发者提供一致的网络请求体验。
+
+## 为什么选择 hs-net？
+
+Python 生态中有许多优秀的 HTTP 库：httpx、aiohttp、requests、curl-cffi、requests-go……每个库都有各自的优势，但也意味着：
+
+- **API 不统一**：切换库需要改大量代码
+- **功能分散**：重试、选择器、中间件需要额外安装和集成
+- **同步异步分裂**：有的库只支持异步，有的只支持同步
+
+hs-net 解决了这些问题——**一套 API，五种引擎，开箱即用**。
+
+## 核心特性
+
+### 五种引擎自由切换
+
+| 引擎 | 异步 | 同步 | 特点 |
+|------|------|------|------|
+| **httpx** | ✅ | ✅ | 默认引擎，支持 HTTP/2 |
+| **aiohttp** | ✅ | ❌ | Python 最成熟的异步 HTTP 库 |
+| **curl-cffi** | ✅ | ✅ | 支持浏览器 TLS 指纹模拟 |
+| **requests** | ❌ | ✅ | 最经典的 Python HTTP 库 |
+| **requests-go** | ✅ | ✅ | Go 语言实现，性能好 |
+
+### 四种数据提取方式
+
+```python title="selectors.py"
+resp = await net.get("https://example.com")
+
+# CSS 选择器
+resp.css("title::text").get()
+
+# XPath
+resp.xpath("//h1/text()").get()
+
+# 正则表达式
+resp.re_first(r"价格: (\d+)元")
+
+# JMESPath（JSON 响应）
+resp.jmespath("data[?age > `18`].name")
+```
+
+### 内置重试 & 中间件
+
+```python title="retry_and_middleware.py"
+# 自动重试 3 次，每次间隔 1 秒
+net = Net(retries=3, retry_delay=1.0)
+
+# 信号中间件
+@net.on_request_before
+async def log_request(req_data):
+    print(f"发送: {req_data.method} {req_data.url}")
+```
+
+## 设计理念
+
+- **统一**：不管用哪个引擎，API 完全一致
+- **增强**：不是简单的封装，而是提供了更多实用功能
+- **开箱即用**：所有引擎都是直接依赖，无需额外安装

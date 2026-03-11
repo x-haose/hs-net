@@ -1,0 +1,74 @@
+[project]
+name = "hs-net"
+version = "0.1.0"
+description = "统一多引擎的增强型 HTTP 客户端，内置重试、选择器、信号中间件"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "昊色居士", email = "x-haose@users.noreply.github.com" }]
+keywords = ["http", "async", "httpx", "aiohttp", "scraping", "network"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Topic :: Internet :: WWW/HTTP",
+    "Framework :: AsyncIO",
+]
+dependencies = [
+    "pydantic>=2.9",
+    "blinker>=1.8",
+    "tenacity>=8.3",
+    "furl>=2.1",
+    "fake-useragent>=1.5",
+    "parsel>=1.9",
+    "httpx[http2,socks]>=0.28",
+    "aiohttp>=3.9",
+    "curl-cffi>=0.7",
+    "requests>=2.31",
+    "requests-go>=1.0",
+    "jmespath>=1.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/x-haose/hs-net"
+Repository = "https://github.com/x-haose/hs-net"
+Issues = "https://github.com/x-haose/hs-net/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hs_net"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "UP", "C", "B", "SIM", "I"]
+ignore = ["B008", "C901"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = [
+    "B501",
+    "B113",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2",
+    "twine>=6.1",
+    "ruff>=0.6",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=0.24",
+]

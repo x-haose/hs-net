@@ -1,0 +1,92 @@
+# 基本请求
+
+## 异步请求
+
+```python title="async_get.py"
+import asyncio
+from hs_net import Net
+
+async def main():
+    # 推荐使用 async with 自动管理连接
+    async with Net() as net:
+        resp = await net.get("https://example.com")
+        print(f"状态码: {resp.status_code}")
+        print(f"是否成功: {resp.ok}")
+        print(f"响应长度: {len(resp.text)} 字符")
+
+asyncio.run(main())
+```
+
+## 同步请求
+
+```python title="sync_get.py"
+from hs_net import SyncNet
+
+# 推荐使用 with 自动管理连接
+with SyncNet() as net:
+    resp = net.get("https://example.com")
+    print(f"状态码: {resp.status_code}")
+    print(f"域名: {resp.domain}")
+    print(f"主机: {resp.host}")
+```
+
+## 手动管理连接
+
+如果不使用上下文管理器，记得手动关闭：
+
+```python title="manual_close.py"
+# 异步
+net = Net()
+resp = await net.get("https://example.com")
+await net.close()  # 手动关闭
+
+# 同步
+net = SyncNet()
+resp = net.get("https://example.com")
+net.close()  # 手动关闭
+```
+
+## Response 常用属性
+
+```python title="response_attrs.py"
+with SyncNet() as net:
+    resp = net.get("https://example.com")
+
+    # 状态信息
+    resp.status_code   # 200
+    resp.ok            # True
+
+    # 响应内容
+    resp.text          # 文本内容
+    resp.content       # 原始字节
+    resp.json_data     # JSON（自动解析，非 JSON 为 None）
+
+    # 元信息
+    resp.url           # 最终 URL（重定向后）
+    resp.domain        # "https://example.com"
+    resp.host          # "example.com"
+    resp.headers       # 响应头字典
+    resp.cookies       # 响应 cookies
+    resp.request_data  # 原始请求信息
+```
+
+## 带参数的请求
+
+```python title="with_params.py"
+with SyncNet() as net:
+    # URL 查询参数
+    resp = net.get("https://httpbin.org/get", params={"q": "python", "page": "1"})
+    # 实际请求: https://httpbin.org/get?q=python&page=1
+
+    # 自定义请求头
+    resp = net.get("https://example.com", headers={"Accept-Language": "zh-CN"})
+
+    # 自定义超时
+    resp = net.get("https://example.com", timeout=5.0)
+
+    # 指定代理
+    resp = net.get("https://example.com", proxy="http://proxy:8080")
+
+    # 自定义 User-Agent
+    resp = net.get("https://example.com", user_agent="MyBot/1.0")
+```

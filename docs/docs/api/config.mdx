@@ -1,0 +1,94 @@
+# NetConfig
+
+全局配置类，基于 Python dataclass。
+
+## 定义
+
+```python
+@dataclass
+class NetConfig:
+    engine: str | EngineEnum = EngineEnum.HTTPX
+    base_url: str = ""
+    timeout: float = 20.0
+    retries: int = 3
+    retry_delay: float = 0.0
+    user_agent: str = "random"
+    proxy: str | None = None
+    verify: bool = True
+    raise_status: bool = True
+    allow_redirects: bool = True
+    concurrency: int | None = None
+    headers: dict[str, Any] = field(default_factory=dict)
+    cookies: dict[str, Any] = field(default_factory=dict)
+    engine_options: dict[str, Any] = field(default_factory=dict)
+```
+
+## 字段说明
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `engine` | `str \| EngineEnum` | `EngineEnum.HTTPX` | HTTP 引擎标识 |
+| `base_url` | `str` | `""` | 基础 URL，自动与路径拼接 |
+| `timeout` | `float` | `20.0` | 请求超时时间（秒） |
+| `retries` | `int` | `3` | 失败重试次数 |
+| `retry_delay` | `float` | `0.0` | 重试间隔（秒），0 为立即重试 |
+| `user_agent` | `str` | `"random"` | UA 配置，支持快捷方式 |
+| `proxy` | `str \| None` | `None` | 代理地址 |
+| `verify` | `bool` | `True` | 是否验证 SSL 证书 |
+| `raise_status` | `bool` | `True` | 非 2xx 是否抛出异常 |
+| `allow_redirects` | `bool` | `True` | 是否自动重定向 |
+| `concurrency` | `int \| None` | `None` | 最大并发数（None 不限制） |
+| `headers` | `dict` | `{}` | 全局默认请求头 |
+| `cookies` | `dict` | `{}` | 全局默认 cookies |
+| `engine_options` | `dict` | `{}` | 引擎特定配置，透传给引擎 |
+
+## User-Agent 快捷方式
+
+| 值 | 说明 |
+|----|------|
+| `"random"` | 每次请求随机生成 |
+| `"chrome"` | Chrome 浏览器 UA |
+| `"firefox"` / `"ff"` | Firefox 浏览器 UA |
+| `"safari"` | Safari 浏览器 UA |
+| `"edge"` | Edge 浏览器 UA |
+| 其他字符串 | 原样使用 |
+
+## EngineEnum
+
+```python
+class EngineEnum(str, Enum):
+    HTTPX = "httpx"
+    AIOHTTP = "aiohttp"
+    REQUESTS = "requests"
+    CURL_CFFI = "curl_cffi"
+    REQUESTS_GO = "requests_go"
+```
+
+## RequestModel
+
+请求模型，封装单次 HTTP 请求的所有参数（Pydantic BaseModel）：
+
+```python
+class RequestModel(BaseModel):
+    url: str
+    method: str = "GET"
+    url_params: dict | None = None
+    form_data: dict | list | str | bytes | None = None
+    json_data: dict | None = None
+    files: dict | list | None = None
+    raise_status: bool = True
+    allow_redirects: bool = True
+    verify: bool = True
+    user_agent: str | None = None
+    headers: dict = {}
+    cookies: dict = {}
+    timeout: float | None = None
+    proxy: str | None = None
+    retries: int | None = None
+    retry_delay: float | None = None
+```
+
+:::tip
+`RequestModel` 通常由框架内部构建，用户一般不需要直接创建。
+在信号中间件的 `on_request_before` 回调中可以访问和修改它。
+:::

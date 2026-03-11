@@ -1,0 +1,104 @@
+# 快速开始
+
+## 安装
+
+:::tip 环境要求
+Python >= 3.10
+:::
+
+```bash
+pip install hs-net
+```
+
+或使用其他包管理器：
+
+```bash
+# uv
+uv add hs-net
+
+# poetry
+poetry add hs-net
+
+# pdm
+pdm add hs-net
+```
+
+所有 5 种 HTTP 引擎都是直接依赖，安装即可用，无需额外配置。
+
+## 第一个请求
+
+### 异步用法
+
+```python title="async_example.py"
+import asyncio
+from hs_net import Net
+
+async def main():
+    async with Net() as net:
+        resp = await net.get("https://example.com")
+        print(resp.status_code)  # 200
+        print(resp.css("title::text").get())  # Example Domain
+
+asyncio.run(main())
+```
+
+### 同步用法
+
+```python title="sync_example.py"
+from hs_net import SyncNet
+
+with SyncNet() as net:
+    resp = net.get("https://example.com")
+    print(resp.status_code)  # 200
+    print(resp.css("title::text").get())  # Example Domain
+```
+
+## 基本概念
+
+### Net vs SyncNet
+
+| | Net | SyncNet |
+|---|---|---|
+| 调用方式 | `await net.get()` | `net.get()` |
+| 上下文管理 | `async with` | `with` |
+| 可用引擎 | httpx, aiohttp, curl-cffi, requests-go | httpx, curl-cffi, requests, requests-go |
+| 适用场景 | 高并发、异步框架 | 脚本、同步框架 |
+
+### Response 对象
+
+每次请求返回的 `Response` 对象包含：
+
+```python
+resp = await net.get("https://example.com")
+
+resp.status_code   # HTTP 状态码
+resp.ok            # 是否 2xx
+resp.text          # 响应文本
+resp.content       # 原始字节
+resp.json_data     # JSON 数据（自动解析）
+resp.headers       # 响应头
+resp.cookies       # 响应 cookies
+resp.url           # 最终 URL（重定向后）
+resp.domain        # 域名（含协议）
+resp.host          # 主机名
+```
+
+### 配置优先级
+
+参数覆盖遵循三级优先级：
+
+```
+请求方法参数  >  构造函数参数  >  NetConfig 默认值
+```
+
+```python title="priority.py"
+# NetConfig 设置 timeout=20（最低优先级）
+config = NetConfig(timeout=20)
+
+# 构造函数设置 timeout=10（中间优先级）
+net = SyncNet(config=config, timeout=10)
+
+# 请求方法设置 timeout=5（最高优先级）
+resp = net.get("https://example.com", timeout=5)
+# 实际超时: 5 秒
+```

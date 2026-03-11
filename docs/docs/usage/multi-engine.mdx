@@ -1,0 +1,104 @@
+# 多引擎切换
+
+hs-net 支持 5 种 HTTP 引擎，切换只需改一个参数。
+
+## 引擎一览
+
+| 引擎 | 异步 | 同步 | 特点 | 适用场景 |
+|------|------|------|------|----------|
+| **httpx** | ✅ | ✅ | 支持 HTTP/2，现代 API | 通用场景（默认） |
+| **aiohttp** | ✅ | ❌ | 最成熟的 Python 异步库 | 高并发异步 |
+| **curl-cffi** | ✅ | ✅ | 浏览器 TLS 指纹模拟 | 反爬、爬虫 |
+| **requests** | ❌ | ✅ | 最经典最稳定 | 简单同步脚本 |
+| **requests-go** | ✅ | ✅ | Go 语言实现 | 追求性能 |
+
+## 切换引擎
+
+### 字符串方式
+
+```python title="engine_string.py"
+# 异步
+async with Net(engine="aiohttp") as net:
+    resp = await net.get("https://example.com")
+
+# 同步
+with SyncNet(engine="requests") as net:
+    resp = net.get("https://example.com")
+```
+
+### 枚举方式
+
+```python title="engine_enum.py"
+from hs_net import EngineEnum
+
+with SyncNet(engine=EngineEnum.CURL_CFFI) as net:
+    resp = net.get("https://example.com")
+```
+
+## 引擎特定配置
+
+通过 `engine_options` 传递引擎特有参数：
+
+### httpx
+
+```python title="httpx_options.py"
+# 关闭 HTTP/2（默认开启）
+net = SyncNet(engine="httpx", engine_options={"http2": False})
+```
+
+### curl-cffi
+
+```python title="curl_cffi_options.py"
+# 模拟 Chrome 120 的 TLS 指纹
+net = SyncNet(
+    engine="curl_cffi",
+    engine_options={
+        "impersonate": "chrome120",   # 浏览器指纹
+    },
+)
+```
+
+:::info 支持的指纹
+curl-cffi 支持多种浏览器指纹：`chrome110`、`chrome120`、`safari15_5`、`edge101` 等。
+详见 [curl-cffi 文档](https://curl-cffi.readthedocs.io/)。
+:::
+
+## 不兼容的引擎
+
+```python
+# ❌ requests 不支持异步
+Net(engine="requests")  # 抛出 ValueError
+
+# ❌ aiohttp 不支持同步
+SyncNet(engine="aiohttp")  # 抛出 ValueError
+```
+
+## 自定义引擎
+
+你可以继承 `EngineBase`（异步）或 `SyncEngineBase`（同步）实现自定义引擎：
+
+```python title="custom_engine.py"
+from hs_net.engines.base import SyncEngineBase
+from hs_net.models import RequestModel
+from hs_net.response import Response
+
+class MySyncEngine(SyncEngineBase):
+    def __init__(self, sem=None, headers=None, cookies=None, verify=True, **engine_options):
+        super().__init__(sem, headers, cookies, verify, **engine_options)
+        # 初始化你的 HTTP 客户端
+
+    def close(self):
+        # 关闭客户端
+
+    @property
+    def cookies(self) -> dict[str, str]:
+        return {}
+
+    def _download(self, request_data: RequestModel) -> Response:
+        # 实现请求逻辑
+        ...
+
+# 使用自定义引擎
+with SyncNet(engine=MySyncEngine) as net:
+    resp = net.get("https://example.com")
+```

@@ -1,0 +1,101 @@
+# 异常
+
+所有 hs-net 异常都继承自 `RequestException`，可以统一捕获。
+
+## 异常层级
+
+```
+RequestException              # 基类
+├── StatusException            # HTTP 状态码非 2xx
+├── TimeoutException           # 请求超时
+├── ConnectionException        # 连接失败
+└── RetryExhausted             # 重试耗尽
+```
+
+## RequestException
+
+所有 hs-net 异常的基类。
+
+```python
+class RequestException(Exception):
+    exception_type: str    # 异常类型名
+    exception_msg: str     # 异常消息
+```
+
+```python
+from hs_net import RequestException
+
+try:
+    resp = net.get("https://example.com")
+except RequestException as e:
+    print(f"类型: {e.exception_type}")
+    print(f"消息: {e.exception_msg}")
+```
+
+## StatusException
+
+HTTP 状态码非 2xx 时抛出（需 `raise_status=True`）。
+
+```python
+class StatusException(RequestException):
+    code: int     # HTTP 状态码
+    url: str      # 请求 URL
+```
+
+```python
+from hs_net import StatusException
+
+try:
+    resp = net.get("https://httpbin.org/status/404")
+except StatusException as e:
+    print(e.code)  # 404
+    print(e.url)   # https://httpbin.org/status/404
+```
+
+## TimeoutException
+
+请求超时时抛出。
+
+```python
+class TimeoutException(RequestException):
+    url: str              # 请求 URL
+    timeout: float | None # 超时时间（秒）
+```
+
+## ConnectionException
+
+连接失败时抛出（DNS 解析失败、连接拒绝、SSL 错误等）。
+
+```python
+class ConnectionException(RequestException):
+    url: str    # 请求 URL
+```
+
+## RetryExhausted
+
+所有重试均失败后抛出。
+
+```python
+class RetryExhausted(RequestException):
+    attempts: int              # 已尝试次数
+    last_exception: Exception  # 最后一次异常
+    url: str                   # 请求 URL
+```
+
+```python
+from hs_net import RetryExhausted
+
+try:
+    resp = net.get("https://httpbin.org/status/500")
+except RetryExhausted as e:
+    print(f"尝试了 {e.attempts} 次")
+    print(f"最后异常: {e.last_exception}")
+    print(f"URL: {e.url}")
+```
+
+## 向后兼容
+
+```python
+from hs_net import RequestStatusException
+# RequestStatusException 是 StatusException 的别名
+```

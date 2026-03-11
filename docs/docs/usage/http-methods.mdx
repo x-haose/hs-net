@@ -1,0 +1,104 @@
+# HTTP 方法
+
+hs-net 支持所有常用的 HTTP 方法。
+
+## GET
+
+```python title="get.py"
+resp = await net.get("https://httpbin.org/get", params={"key": "value"})
+```
+
+## POST
+
+### JSON 数据
+
+```python title="post_json.py"
+resp = await net.post("https://httpbin.org/post", json_data={
+    "username": "alice",
+    "age": 25,
+})
+print(resp.jmespath("json"))
+# => {"username": "alice", "age": 25}
+```
+
+### 表单数据
+
+```python title="post_form.py"
+resp = await net.post("https://httpbin.org/post", form_data={
+    "email": "test@example.com",
+    "password": "123456",
+})
+print(resp.jmespath("form"))
+# => {"email": "test@example.com", "password": "123456"}
+```
+
+:::tip 表单编码
+传入 `dict` 或 `list[tuple]` 时会自动进行 URL 编码，并设置 `Content-Type: application/x-www-form-urlencoded`。
+
+传入 `str` 或 `bytes` 则原样发送。
+:::
+
+### 文件上传
+
+```python title="post_file.py"
+resp = await net.post("https://httpbin.org/post", files={
+    "file": ("hello.txt", b"Hello, World!", "text/plain"),
+})
+print(resp.jmespath("files"))
+# => {"file": "Hello, World!"}
+```
+
+:::info 表单 + 文件
+同时传 `form_data` 和 `files` 时，`form_data` 不会被 URL 编码，而是作为 multipart 表单字段处理。
+:::
+
+## PUT
+
+```python title="put.py"
+resp = await net.put("https://httpbin.org/put", json_data={
+    "id": 1,
+    "name": "updated",
+})
+```
+
+## PATCH
+
+```python title="patch.py"
+resp = await net.patch("https://httpbin.org/patch", json_data={
+    "name": "patched",
+})
+```
+
+## DELETE
+
+```python title="delete.py"
+resp = await net.delete("https://httpbin.org/delete")
+```
+
+## HEAD
+
+```python title="head.py"
+resp = await net.head("https://example.com")
+print(resp.headers)  # 只有响应头，没有响应体
+```
+
+## OPTIONS
+
+```python title="options.py"
+resp = await net.options("https://example.com")
+```
+
+## 通用 request 方法
+
+所有快捷方法底层都调用 `request()`，你也可以直接使用：
+
+```python title="request.py"
+resp = await net.request(
+    method="POST",
+    url="https://httpbin.org/post",
+    json_data={"key": "value"},
+    headers={"X-Custom": "header"},
+    timeout=10.0,
+    retries=3,
+)
+```

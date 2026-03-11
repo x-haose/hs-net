@@ -1,0 +1,80 @@
+name: Publish to PyPI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check_version.outputs.should_publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if version changed
+        id: check_version
+        run: |
+          # 获取当前版本
+          CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' pyproject.toml | head -1)
+          echo "Current version: $CURRENT_VERSION"
+
+          # 检查该版本 tag 是否已存在
+          if git tag -l "v$CURRENT_VERSION" | grep -q .; then
+            echo "Version v$CURRENT_VERSION already published, skipping."
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version v$CURRENT_VERSION detected."
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          fi
+
+  ci:
+    needs: check
+    if: needs.check.outputs.should_publish == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [check, ci]
+    if: needs.check.outputs.should_publish == 'true'
+    permissions:
+      id-token: write
+      contents: write
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep -oP 'version = "\K[^"]+' pyproject.toml | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        run: |
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.version.outputs.version }}"
+          name: "v${{ steps.version.outputs.version }}"
+          files: dist/*
+          generate_release_notes: true

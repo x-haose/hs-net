@@ -1,0 +1,140 @@
+# Net
+
+异步 HTTP 客户端，支持 `async with` 上下文管理。
+
+## 构造函数
+
+```python
+Net(
+    engine: str | EngineEnum | type[EngineBase] = None,
+    *,
+    base_url: str = None,
+    timeout: float = None,
+    retries: int = None,
+    retry_delay: float = None,
+    user_agent: str = None,
+    proxy: str = None,
+    verify: bool = None,
+    raise_status: bool = None,
+    allow_redirects: bool = None,
+    concurrency: int = None,
+    headers: dict[str, Any] = None,
+    cookies: dict[str, Any] = None,
+    engine_options: dict[str, Any] = None,
+    config: NetConfig = None,
+)
+```
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `engine` | `str \| EngineEnum` | `"httpx"` | HTTP 引擎 |
+| `base_url` | `str` | `""` | 基础 URL |
+| `timeout` | `float` | `20.0` | 超时时间（秒） |
+| `retries` | `int` | `3` | 重试次数 |
+| `retry_delay` | `float` | `0.0` | 重试间隔（秒） |
+| `user_agent` | `str` | `"random"` | User-Agent |
+| `proxy` | `str` | `None` | 代理地址 |
+| `verify` | `bool` | `True` | SSL 验证 |
+| `raise_status` | `bool` | `True` | 非 2xx 是否抛异常 |
+| `allow_redirects` | `bool` | `True` | 是否跟随重定向 |
+| `concurrency` | `int` | `None` | 最大并发数 |
+| `headers` | `dict` | `{}` | 全局请求头 |
+| `cookies` | `dict` | `{}` | 全局 cookies |
+| `engine_options` | `dict` | `{}` | 引擎特定配置 |
+| `config` | `NetConfig` | `None` | 配置对象 |
+
+## 方法
+
+### request
+
+```python
+async def request(
+    method: str,
+    url: str,
+    *,
+    params: dict = None,
+    json_data: dict = None,
+    form_data: dict | list | str | bytes = None,
+    files: dict | list = None,
+    user_agent: str = None,
+    headers: dict = None,
+    cookies: dict = None,
+    timeout: float = None,
+    proxy: str = None,
+    verify: bool = None,
+    retries: int = None,
+    retry_delay: float = None,
+    raise_status: bool = None,
+    allow_redirects: bool = None,
+) -> Response
+```
+
+通用请求方法，所有快捷方法的底层实现。
+
+### get
+
+```python
+async def get(url: str, *, params: dict = None, **kwargs) -> Response
+```
+
+### post
+
+```python
+async def post(
+    url: str,
+    *,
+    params: dict = None,
+    json_data: dict = None,
+    form_data: dict | list | str | bytes = None,
+    files: dict | list = None,
+    **kwargs,
+) -> Response
+```
+
+### put / patch
+
+```python
+async def put(url: str, *, json_data: dict = None, **kwargs) -> Response
+async def patch(url: str, *, json_data: dict = None, **kwargs) -> Response
+```
+
+### delete / head / options
+
+```python
+async def delete(url: str, **kwargs) -> Response
+async def head(url: str, *, params: dict = None, **kwargs) -> Response
+async def options(url: str, **kwargs) -> Response
+```
+
+### close
+
+```python
+async def close() -> None
+```
+
+关闭客户端，释放底层引擎资源。
+
+## 属性
+
+### cookies
+
+```python
+@property
+def cookies(self) -> dict[str, str]
+```
+
+获取当前会话的 cookies。
+
+## 信号装饰器
+
+### on_request_before
+
+注册请求前中间件。回调接收 `RequestModel`，可返回修改后的 `RequestModel` 或 `Response`。
+
+### on_response_after
+
+注册响应后中间件。回调接收 `Response`，可返回替换的 `Response`。
+
+### on_request_retry
+
+注册重试中间件。回调接收触发重试的 `Exception`。

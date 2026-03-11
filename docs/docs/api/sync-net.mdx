@@ -1,0 +1,70 @@
+# SyncNet
+
+同步 HTTP 客户端，支持 `with` 上下文管理。
+
+接口与 [Net](/api/net) 完全一致，区别仅在于：
+
+- 所有方法为同步调用（无 `async`/`await`）
+- 使用 `with` 而非 `async with`
+- 使用线程信号量（`threading.Semaphore`）控制并发
+- 不支持 `aiohttp` 引擎
+- 信号中间件仅支持同步回调
+
+## 构造函数
+
+```python
+SyncNet(
+    engine: str | EngineEnum | type[SyncEngineBase] = None,
+    *,
+    base_url: str = None,
+    timeout: float = None,
+    retries: int = None,
+    retry_delay: float = None,
+    user_agent: str = None,
+    proxy: str = None,
+    verify: bool = None,
+    raise_status: bool = None,
+    allow_redirects: bool = None,
+    concurrency: int = None,
+    headers: dict[str, Any] = None,
+    cookies: dict[str, Any] = None,
+    engine_options: dict[str, Any] = None,
+    config: NetConfig = None,
+)
+```
+
+参数同 [Net](/api/net#构造函数)。
+
+## 方法
+
+```python
+def request(method, url, **kwargs) -> Response
+def get(url, *, params=None, **kwargs) -> Response
+def post(url, *, params=None, json_data=None, form_data=None, files=None, **kwargs) -> Response
+def put(url, *, json_data=None, **kwargs) -> Response
+def patch(url, *, json_data=None, **kwargs) -> Response
+def delete(url, **kwargs) -> Response
+def head(url, *, params=None, **kwargs) -> Response
+def options(url, **kwargs) -> Response
+def close() -> None
+```
+
+## 可用引擎
+
+| 引擎 | 支持 |
+|------|------|
+| httpx | ✅ |
+| curl-cffi | ✅ |
+| requests | ✅ |
+| requests-go | ✅ |
+| aiohttp | ❌ |
+
+## 使用示例
+
+```python title="sync_example.py"
+from hs_net import SyncNet
+
+with SyncNet(engine="requests", retries=3) as net:
+    resp = net.get("https://example.com")
+    print(resp.css("title::text").get())
+```
