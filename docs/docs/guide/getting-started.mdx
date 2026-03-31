@@ -7,7 +7,15 @@ Python >= 3.10
 :::
 
 ```bash
+# 核心安装（默认 httpx 引擎）
 pip install hs-net
+
+# 按需安装额外引擎
+pip install hs-net[curl]         # curl-cffi（浏览器指纹模拟）
+pip install hs-net[aiohttp]      # aiohttp
+pip install hs-net[requests]     # requests
+pip install hs-net[requests-go]  # requests-go
+pip install hs-net[all]          # 全部引擎
 ```
 
 或使用其他包管理器：
@@ -15,15 +23,14 @@ pip install hs-net
 ```bash
 # uv
 uv add hs-net
+uv add "hs-net[all]"    # 全部引擎
 
 # poetry
 poetry add hs-net
-
-# pdm
-pdm add hs-net
+poetry add "hs-net[all]"
 ```
 
-所有 5 种 HTTP 引擎都是直接依赖，安装即可用，无需额外配置。
+默认安装仅包含 httpx 引擎，其他引擎按需安装。引擎缺失时会抛出清晰的 `EngineNotInstalled` 异常并提示安装命令。
 
 ## 第一个请求
 
@@ -52,6 +59,26 @@ with SyncNet() as net:
     print(resp.status_code)  # 200
     print(resp.css("title::text").get())  # Example Domain
 ```
+
+### 快捷函数（最简用法）
+
+无需实例化客户端，一行发起请求：
+
+```python title="shortcuts.py"
+import hs_net
+
+# 异步
+resp = await hs_net.get("https://example.com")
+print(resp.css("title::text").get())
+
+# 同步
+resp = hs_net.sync_get("https://example.com")
+print(resp.text)
+```
+
+:::tip 什么时候用快捷函数？
+快捷函数每次创建临时客户端，适合简单的一次性请求。需要复用连接、配置中间件、控制并发时，请使用 `Net` / `SyncNet`。
+:::
 
 ## 基本概念
 

@@ -17,7 +17,7 @@ hero:
     alt: hs-net
 features:
   - title: 多引擎切换
-    details: 支持 httpx、aiohttp、curl-cffi、requests、requests-go 五种引擎，统一 API，按需切换
+    details: 支持 httpx、aiohttp、curl-cffi、requests、requests-go 五种引擎，统一 API，按需安装按需切换
     icon: 🔄
   - title: 同步 & 异步
     details: Net（异步）和 SyncNet（同步）两套客户端，接口完全一致，按场景选择
@@ -34,4 +34,7 @@ features:
   - title: 反爬支持
     details: curl-cffi 引擎支持浏览器 TLS 指纹模拟，配合随机 User-Agent，轻松应对反爬
     icon: 🛡️
+  - title: 快捷函数
+    details: await hs_net.get(url) 一行发起请求，无需实例化客户端，简单场景零配置
+    icon: ✨
 ---

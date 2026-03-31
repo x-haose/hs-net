@@ -4,13 +4,13 @@ hs-net 支持 5 种 HTTP 引擎，切换只需改一个参数。
 
 ## 引擎一览
 
-| 引擎 | 异步 | 同步 | 特点 | 适用场景 |
-|------|------|------|------|----------|
-| **httpx** | ✅ | ✅ | 支持 HTTP/2，现代 API | 通用场景（默认） |
-| **aiohttp** | ✅ | ❌ | 最成熟的 Python 异步库 | 高并发异步 |
-| **curl-cffi** | ✅ | ✅ | 浏览器 TLS 指纹模拟 | 反爬、爬虫 |
-| **requests** | ❌ | ✅ | 最经典最稳定 | 简单同步脚本 |
-| **requests-go** | ✅ | ✅ | Go 语言实现 | 追求性能 |
+| 引擎 | 异步 | 同步 | HTTP/2 | TLS 指纹 | SOCKS 代理 | 安装方式 | 适用场景 |
+|------|:----:|:----:|:------:|:--------:|:----------:|----------|----------|
+| **httpx** | ✅ | ✅ | ✅ | ❌ | ✅ | 默认 | 通用场景（默认） |
+| **aiohttp** | ✅ | ❌ | ❌ | ❌ | ❌ | `[aiohttp]` | 高并发异步 |
+| **curl-cffi** | ✅ | ✅ | ✅ | ✅ | ✅ | `[curl]` | 反爬、爬虫 |
+| **requests** | ❌ | ✅ | ❌ | ❌ | ❌ | `[requests]` | 简单同步脚本 |
+| **requests-go** | ✅ | ✅ | ✅ | ✅ | ❌ | `[requests-go]` | 追求性能 |
 
 ## 切换引擎
 
@@ -71,6 +71,20 @@ Net(engine="requests")  # 抛出 ValueError
 
 # ❌ aiohttp 不支持同步
 SyncNet(engine="aiohttp")  # 抛出 ValueError
+```
+
+## 引擎未安装
+
+使用未安装的引擎时，会抛出 `EngineNotInstalled` 异常并提示安装命令：
+
+```python
+from hs_net import SyncNet, EngineNotInstalled
+
+try:
+    net = SyncNet(engine="curl_cffi")
+except EngineNotInstalled as e:
+    print(e)
+    # [EngineNotInstalled]: 引擎 curl-cffi 需要额外安装依赖: pip install hs-net[curl]
 ```
 
 ## 自定义引擎
