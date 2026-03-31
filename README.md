@@ -14,10 +14,18 @@
 ## 安装
 
 ```bash
+# 核心安装（默认 httpx 引擎）
 pip install hs-net
+
+# 按需安装额外引擎
+pip install hs-net[aiohttp]      # aiohttp 引擎
+pip install hs-net[curl]         # curl-cffi 引擎（浏览器指纹模拟）
+pip install hs-net[requests]     # requests 引擎
+pip install hs-net[requests-go]  # requests-go 引擎
+pip install hs-net[all]          # 全部引擎
 ```
 
-> Python >= 3.10，所有引擎开箱即用，无需额外安装。
+> Python >= 3.10。默认安装仅包含 httpx 引擎，其他引擎按需安装。
 
 ## 快速开始
 
@@ -45,6 +53,18 @@ with SyncNet() as net:
     print(resp.css("title::text").get())  # Example Domain
 ```
 
+## 引擎对比
+
+| 特性 | httpx | aiohttp | curl-cffi | requests | requests-go |
+|------|:-----:|:-------:|:---------:|:--------:|:-----------:|
+| 异步支持 | ✅ | ✅ | ✅ | ❌ | ✅ |
+| 同步支持 | ✅ | ❌ | ✅ | ✅ | ✅ |
+| HTTP/2 | ✅ | ❌ | ✅ | ❌ | ✅ |
+| TLS 指纹模拟 | ❌ | ❌ | ✅ | ❌ | ✅ |
+| SOCKS 代理 | ✅ | ❌ | ✅ | ❌ | ❌ |
+| 安装方式 | 默认 | `[aiohttp]` | `[curl]` | `[requests]` | `[requests-go]` |
+| 推荐场景 | 通用首选 | 高并发 | 反爬 | 兼容老项目 | 反爬+性能 |
+
 ## 引擎切换
 
 ```python
@@ -63,6 +83,24 @@ SyncNet(engine="requests")
 # requests-go
 Net(engine="requests_go")
 ```
+
+## 快捷函数（无需实例化）
+
+```python
+import hs_net
+
+# 异步
+resp = await hs_net.get("https://example.com")
+resp = await hs_net.post("https://api.example.com/data", json_data={"key": "val"})
+
+# 同步
+resp = hs_net.sync_get("https://example.com")
+
+# 指定引擎
+resp = await hs_net.get("https://example.com", engine="curl_cffi")
+```
+
+> 快捷函数每次创建临时客户端，适合简单请求。需要复用连接、配置中间件时请使用 `Net` / `SyncNet`。
 
 ## 数据提取
 
