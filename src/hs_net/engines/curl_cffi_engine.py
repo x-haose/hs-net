@@ -5,10 +5,15 @@ from json import JSONDecodeError
 from threading import Semaphore as ThreadSemaphore
 from typing import Any
 
-from curl_cffi.const import CurlHttpVersion
-from curl_cffi.requests import AsyncSession, Session
+try:
+    from curl_cffi.const import CurlHttpVersion
+    from curl_cffi.requests import AsyncSession, Session
 
-from hs_net.exceptions import StatusException
+    _HAS_CURL_CFFI = True
+except ImportError:
+    _HAS_CURL_CFFI = False
+
+from hs_net.exceptions import EngineNotInstalled, StatusException
 from hs_net.models import RequestModel
 from hs_net.response import Response
 
@@ -95,6 +100,9 @@ class CurlCffiEngine(EngineBase):
             verify: 是否验证 SSL 证书。
             **engine_options: curl-cffi 特定配置（如 impersonate、http_version）。
         """
+        if not _HAS_CURL_CFFI:
+            raise EngineNotInstalled("curl-cffi", "hs-net[curl]")
+
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         self.client = AsyncSession(
@@ -154,6 +162,9 @@ class SyncCurlCffiEngine(SyncEngineBase):
             verify: 是否验证 SSL 证书。
             **engine_options: curl-cffi 特定配置（如 impersonate、http_version）。
         """
+        if not _HAS_CURL_CFFI:
+            raise EngineNotInstalled("curl-cffi", "hs-net[curl]")
+
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         self.client = Session(

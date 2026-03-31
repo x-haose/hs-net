@@ -3,9 +3,14 @@ from __future__ import annotations
 from asyncio import Semaphore
 from typing import Any
 
-from aiohttp import ClientSession, ClientTimeout, ContentTypeError, TCPConnector
+try:
+    from aiohttp import ClientSession, ClientTimeout, ContentTypeError, TCPConnector
 
-from hs_net.exceptions import StatusException
+    _HAS_AIOHTTP = True
+except ImportError:
+    _HAS_AIOHTTP = False
+
+from hs_net.exceptions import EngineNotInstalled, StatusException
 from hs_net.models import RequestModel
 from hs_net.response import Response
 
@@ -32,6 +37,9 @@ class AiohttpEngine(EngineBase):
             verify: 是否验证 SSL 证书。
             **engine_options: aiohttp 特定配置。
         """
+        if not _HAS_AIOHTTP:
+            raise EngineNotInstalled("aiohttp", "hs-net[aiohttp]")
+
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         self.client = ClientSession(

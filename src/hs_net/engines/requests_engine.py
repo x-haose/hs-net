@@ -4,10 +4,15 @@ from json import JSONDecodeError
 from threading import Semaphore as ThreadSemaphore
 from typing import Any
 
-from requests import Session
-from requests.utils import cookiejar_from_dict, dict_from_cookiejar
+try:
+    from requests import Session
+    from requests.utils import cookiejar_from_dict, dict_from_cookiejar
 
-from hs_net.exceptions import StatusException
+    _HAS_REQUESTS = True
+except ImportError:
+    _HAS_REQUESTS = False
+
+from hs_net.exceptions import EngineNotInstalled, StatusException
 from hs_net.models import RequestModel
 from hs_net.response import Response
 
@@ -34,6 +39,9 @@ class SyncRequestsEngine(SyncEngineBase):
             verify: 是否验证 SSL 证书。
             **engine_options: requests 特定配置。
         """
+        if not _HAS_REQUESTS:
+            raise EngineNotInstalled("requests", "hs-net[requests]")
+
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         self.client = Session()

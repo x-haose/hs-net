@@ -5,10 +5,15 @@ from json import JSONDecodeError
 from threading import Semaphore as ThreadSemaphore
 from typing import Any
 
-from requests.utils import cookiejar_from_dict, dict_from_cookiejar
-from requests_go import AsyncSession, Session
+try:
+    from requests.utils import cookiejar_from_dict, dict_from_cookiejar
+    from requests_go import AsyncSession, Session
 
-from hs_net.exceptions import StatusException
+    _HAS_REQUESTS_GO = True
+except ImportError:
+    _HAS_REQUESTS_GO = False
+
+from hs_net.exceptions import EngineNotInstalled, StatusException
 from hs_net.models import RequestModel
 from hs_net.response import Response
 
@@ -95,6 +100,9 @@ class RequestsGoEngine(EngineBase):
             verify: 是否验证 SSL 证书。
             **engine_options: requests-go 特定配置。
         """
+        if not _HAS_REQUESTS_GO:
+            raise EngineNotInstalled("requests-go", "hs-net[requests-go]")
+
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         self.client = AsyncSession()
@@ -151,6 +159,9 @@ class SyncRequestsGoEngine(SyncEngineBase):
             verify: 是否验证 SSL 证书。
             **engine_options: requests-go 特定配置。
         """
+        if not _HAS_REQUESTS_GO:
+            raise EngineNotInstalled("requests-go", "hs-net[requests-go]")
+
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         self.client = Session()
