@@ -80,3 +80,21 @@ class TestRetryExhausted:
     def test_catch_as_request_exception(self):
         with pytest.raises(RequestException):
             raise RetryExhausted(attempts=1, last_exception=Exception("e"))
+
+
+class TestEngineNotInstalled:
+    """引擎未安装异常测试。"""
+
+    def test_message_contains_install_command(self):
+        from hs_net.exceptions import EngineNotInstalled
+
+        exc = EngineNotInstalled("aiohttp", "hs-net[aiohttp]")
+        assert "aiohttp" in str(exc)
+        assert "pip install hs-net[aiohttp]" in str(exc)
+
+    def test_attributes(self):
+        from hs_net.exceptions import EngineNotInstalled
+
+        exc = EngineNotInstalled("curl-cffi", "hs-net[curl]")
+        assert exc.engine_name == "curl-cffi"
+        assert exc.install_package == "hs-net[curl]"

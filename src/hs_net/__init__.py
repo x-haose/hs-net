@@ -6,6 +6,7 @@ from hs_net.client import Net
 from hs_net.config import NetConfig
 from hs_net.exceptions import (
     ConnectionException,
+    EngineNotInstalled,
     RequestException,
     RequestStatusException,
     RetryExhausted,
@@ -25,6 +26,7 @@ __all__ = [
     "Response",
     "Selector",
     "SelectorList",
+    "EngineNotInstalled",
     "RequestException",
     "StatusException",
     "TimeoutException",

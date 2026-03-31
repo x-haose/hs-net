@@ -99,5 +99,31 @@ class RetryExhausted(RequestException):
         super().__init__("RetryExhausted", f"{attempts} 次重试全部失败 [{exc_type}]: {last_exception} url={url}")
 
 
+class EngineNotInstalled(RequestException):
+    """引擎依赖未安装异常。
+
+    当用户指定的引擎对应的第三方库未安装时抛出，
+    异常消息中包含安装命令以引导用户安装。
+
+    Attributes:
+        engine_name: 引擎名称。
+        install_package: 安装包名称（含 extras）。
+    """
+
+    def __init__(self, engine_name: str, install_package: str):
+        """初始化引擎未安装异常。
+
+        Args:
+            engine_name: 引擎名称，如 "aiohttp"、"curl-cffi"。
+            install_package: 安装包名称，如 "hs-net[aiohttp]"。
+        """
+        self.engine_name = engine_name
+        self.install_package = install_package
+        super().__init__(
+            "EngineNotInstalled",
+            f"引擎 {engine_name} 需要额外安装依赖: pip install {install_package}",
+        )
+
+
 # 向后兼容别名
 RequestStatusException = StatusException
