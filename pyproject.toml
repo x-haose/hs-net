@@ -26,12 +26,20 @@ dependencies = [
     "furl>=2.1",
     "fake-useragent>=1.5",
     "parsel>=1.9",
+    "jmespath>=1.1.0",
     "httpx[http2,socks]>=0.28",
+]
+
+[project.optional-dependencies]
+aiohttp = ["aiohttp>=3.9"]
+curl = ["curl-cffi>=0.7"]
+requests = ["requests>=2.31"]
+requests-go = ["requests-go>=1.0"]
+all = [
     "aiohttp>=3.9",
     "curl-cffi>=0.7",
     "requests>=2.31",
     "requests-go>=1.0",
-    "jmespath>=1.1.0",
 ]
 
 [project.urls]
@@ -66,6 +74,7 @@ skips = [
 
 [dependency-groups]
 dev = [
+    "hs-net[all]",
     "bandit[toml]>=1.7",
     "pre-commit>=4.2",
     "twine>=6.1",

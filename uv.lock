@@ -729,23 +729,40 @@ name = "hs-net"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "aiohttp" },
     { name = "blinker" },
-    { name = "curl-cffi" },
     { name = "fake-useragent" },
     { name = "furl" },
     { name = "httpx", extra = ["http2", "socks"] },
     { name = "jmespath" },
     { name = "parsel" },
     { name = "pydantic" },
+    { name = "tenacity" },
+]
+
+[package.optional-dependencies]
+aiohttp = [
+    { name = "aiohttp" },
+]
+all = [
+    { name = "aiohttp" },
+    { name = "curl-cffi" },
     { name = "requests" },
     { name = "requests-go" },
-    { name = "tenacity" },
+]
+curl = [
+    { name = "curl-cffi" },
+]
+requests = [
+    { name = "requests" },
+]
+requests-go = [
+    { name = "requests-go" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "bandit", extra = ["toml"] },
+    { name = "hs-net", extra = ["all"] },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -755,23 +772,29 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.9" },
+    { name = "aiohttp", marker = "extra == 'aiohttp'", specifier = ">=3.9" },
+    { name = "aiohttp", marker = "extra == 'all'", specifier = ">=3.9" },
     { name = "blinker", specifier = ">=1.8" },
-    { name = "curl-cffi", specifier = ">=0.7" },
+    { name = "curl-cffi", marker = "extra == 'all'", specifier = ">=0.7" },
+    { name = "curl-cffi", marker = "extra == 'curl'", specifier = ">=0.7" },
     { name = "fake-useragent", specifier = ">=1.5" },
     { name = "furl", specifier = ">=2.1" },
     { name = "httpx", extras = ["http2", "socks"], specifier = ">=0.28" },
     { name = "jmespath", specifier = ">=1.1.0" },
     { name = "parsel", specifier = ">=1.9" },
     { name = "pydantic", specifier = ">=2.9" },
-    { name = "requests", specifier = ">=2.31" },
-    { name = "requests-go", specifier = ">=1.0" },
+    { name = "requests", marker = "extra == 'all'", specifier = ">=2.31" },
+    { name = "requests", marker = "extra == 'requests'", specifier = ">=2.31" },
+    { name = "requests-go", marker = "extra == 'all'", specifier = ">=1.0" },
+    { name = "requests-go", marker = "extra == 'requests-go'", specifier = ">=1.0" },
     { name = "tenacity", specifier = ">=8.3" },
 ]
+provides-extras = ["aiohttp", "curl", "requests", "requests-go", "all"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "bandit", extras = ["toml"], specifier = ">=1.7" },
+    { name = "hs-net", extras = ["all"] },
     { name = "pre-commit", specifier = ">=4.2" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
