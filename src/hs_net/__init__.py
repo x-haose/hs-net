@@ -1,6 +1,6 @@
 """hs-net: 统一多引擎的增强型 HTTP 客户端"""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from hs_net.client import Net
 from hs_net.config import NetConfig

@@ -1,6 +1,6 @@
 [project]
 name = "hs-net"
-version = "0.1.0"
+version = "0.2.0"
 description = "统一多引擎的增强型 HTTP 客户端，内置重试、选择器、信号中间件"
 readme = "README.md"
 license = "MIT"
