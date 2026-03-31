@@ -120,7 +120,10 @@ async def batch_request_example():
 
 
 def anti_bot_example():
-    """使用 curl_cffi 引擎模拟浏览器指纹。"""
+    """使用 curl_cffi 引擎模拟浏览器指纹。
+
+    注意: 需要安装 curl-cffi 引擎: pip install hs-net[curl]
+    """
     with SyncNet(
         engine="curl_cffi",
         verify=False,

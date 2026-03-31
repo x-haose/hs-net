@@ -8,6 +8,7 @@ import asyncio
 
 from hs_net import (
     EngineEnum,
+    EngineNotInstalled,
     Net,
     NetConfig,
     RequestException,
@@ -39,6 +40,7 @@ def config_example():
         print(f"Config 示例: {resp.status_code}")
 
     # 方式 2: 继承自定义配置类（适合团队统一配置）
+    # 注意: curl_cffi 需要额外安装: pip install hs-net[curl]
     class MyProjectConfig(NetConfig):
         engine: str | EngineEnum = EngineEnum.CURL_CFFI
         base_url: str = "https://example.com"
@@ -111,6 +113,13 @@ def error_handling_example():
             net.get("https://example.com/nonexistent-page-12345")
         except RequestException as e:
             print(f"请求异常: {e}")
+
+    # 捕获引擎未安装异常
+    try:
+        with SyncNet(engine="curl_cffi", verify=False, retries=0) as net:
+            net.get("https://example.com")
+    except EngineNotInstalled as e:
+        print(f"引擎未安装: {e.engine_name}, 请运行: pip install {e.install_package}")
 
     # 关闭异常抛出，手动检查状态码
     with SyncNet(verify=False, retries=0, raise_status=False) as net:

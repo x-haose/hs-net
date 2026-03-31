@@ -2,6 +2,13 @@
 示例 5: 多引擎切换
 
 hs-net 支持 5 种 HTTP 引擎，各有特点。本示例演示如何切换引擎以及各引擎的适用场景。
+
+注意: httpx 为默认引擎，其他引擎需按需安装:
+    pip install hs-net[aiohttp]      # aiohttp
+    pip install hs-net[curl]         # curl-cffi
+    pip install hs-net[requests]     # requests
+    pip install hs-net[requests-go]  # requests-go
+    pip install hs-net[all]          # 全部引擎
 """
 
 import asyncio
