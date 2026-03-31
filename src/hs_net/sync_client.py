@@ -10,10 +10,7 @@ from tenacity import Future, RetryCallState, Retrying, stop_after_attempt, wait_
 from hs_net._request_builder import build_request
 from hs_net.config import NetConfig
 from hs_net.engines.base import SyncEngineBase
-from hs_net.engines.curl_cffi_engine import SyncCurlCffiEngine
 from hs_net.engines.httpx_engine import SyncHttpxEngine
-from hs_net.engines.requests_engine import SyncRequestsEngine
-from hs_net.engines.requests_go_engine import SyncRequestsGoEngine
 from hs_net.exceptions import RetryExhausted, StatusException
 from hs_net.models import EngineEnum, RequestModel
 from hs_net.response import Response
@@ -21,12 +18,26 @@ from hs_net.signals import SignalManager
 
 logger = logging.getLogger("hs_net")
 
-_SYNC_ENGINE_MAP: dict[str, type[SyncEngineBase]] = {
-    "httpx": SyncHttpxEngine,
-    "curl_cffi": SyncCurlCffiEngine,
-    "requests": SyncRequestsEngine,
-    "requests_go": SyncRequestsGoEngine,
-}
+
+def _get_sync_engine_map() -> dict[str, type[SyncEngineBase]]:
+    """延迟构建同步引擎映射表。
+
+    仅在首次调用时导入各引擎模块，避免在未安装可选依赖时
+    因顶层 import 失败而导致整个包不可用。
+
+    Returns:
+        引擎名称到引擎类的映射字典。
+    """
+    from hs_net.engines.curl_cffi_engine import SyncCurlCffiEngine
+    from hs_net.engines.requests_engine import SyncRequestsEngine
+    from hs_net.engines.requests_go_engine import SyncRequestsGoEngine
+
+    return {
+        "httpx": SyncHttpxEngine,
+        "curl_cffi": SyncCurlCffiEngine,
+        "requests": SyncRequestsEngine,
+        "requests_go": SyncRequestsGoEngine,
+    }
 
 
 def _resolve_sync_engine_cls(engine: str | EngineEnum | type[SyncEngineBase]) -> type[SyncEngineBase]:
@@ -49,8 +60,9 @@ def _resolve_sync_engine_cls(engine: str | EngineEnum | type[SyncEngineBase]) ->
     if engine_value == "aiohttp":
         raise ValueError("aiohttp 引擎不支持同步，请使用 Net 或选择其他引擎")
 
-    if engine_value in _SYNC_ENGINE_MAP:
-        return _SYNC_ENGINE_MAP[engine_value]
+    engine_map = _get_sync_engine_map()
+    if engine_value in engine_map:
+        return engine_map[engine_value]
 
     raise ValueError(f"不支持的同步引擎: {engine_value}")
 

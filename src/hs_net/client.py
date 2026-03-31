@@ -9,11 +9,8 @@ from tenacity import AsyncRetrying, Future, RetryCallState, stop_after_attempt, 
 
 from hs_net._request_builder import build_request
 from hs_net.config import NetConfig
-from hs_net.engines.aiohttp_engine import AiohttpEngine
 from hs_net.engines.base import EngineBase
-from hs_net.engines.curl_cffi_engine import CurlCffiEngine
 from hs_net.engines.httpx_engine import HttpxEngine
-from hs_net.engines.requests_go_engine import RequestsGoEngine
 from hs_net.exceptions import RetryExhausted, StatusException
 from hs_net.models import EngineEnum, RequestModel
 from hs_net.response import Response
@@ -21,12 +18,26 @@ from hs_net.signals import SignalManager
 
 logger = logging.getLogger("hs_net")
 
-_ASYNC_ENGINE_MAP: dict[str, type[EngineBase]] = {
-    "httpx": HttpxEngine,
-    "aiohttp": AiohttpEngine,
-    "curl_cffi": CurlCffiEngine,
-    "requests_go": RequestsGoEngine,
-}
+
+def _get_async_engine_map() -> dict[str, type[EngineBase]]:
+    """延迟构建异步引擎映射表。
+
+    仅在首次调用时导入各引擎模块，避免在未安装可选依赖时
+    因顶层 import 失败而导致整个包不可用。
+
+    Returns:
+        引擎名称到引擎类的映射字典。
+    """
+    from hs_net.engines.aiohttp_engine import AiohttpEngine
+    from hs_net.engines.curl_cffi_engine import CurlCffiEngine
+    from hs_net.engines.requests_go_engine import RequestsGoEngine
+
+    return {
+        "httpx": HttpxEngine,
+        "aiohttp": AiohttpEngine,
+        "curl_cffi": CurlCffiEngine,
+        "requests_go": RequestsGoEngine,
+    }
 
 
 def _resolve_async_engine_cls(engine: str | EngineEnum | type[EngineBase]) -> type[EngineBase]:
@@ -49,8 +60,9 @@ def _resolve_async_engine_cls(engine: str | EngineEnum | type[EngineBase]) -> ty
     if engine_value == "requests":
         raise ValueError("requests 引擎不支持异步，请使用 SyncNet 或选择其他引擎")
 
-    if engine_value in _ASYNC_ENGINE_MAP:
-        return _ASYNC_ENGINE_MAP[engine_value]
+    engine_map = _get_async_engine_map()
+    if engine_value in engine_map:
+        return engine_map[engine_value]
 
     raise ValueError(f"不支持的异步引擎: {engine_value}")
 
