@@ -5,11 +5,13 @@ from inspect import iscoroutinefunction
 from typing import Any
 
 from blinker import Signal
-from blinker import signal as get_signal
 
 
 class SignalManager:
     """信号中间件管理器，基于 blinker 实现请求生命周期钩子。
+
+    使用本地 Signal 实例（而非全局命名信号），确保客户端关闭后
+    信号对象可被垃圾回收，避免内存泄漏。
 
     管理三个信号:
         - request_before: 请求发送前触发，可修改请求参数或直接返回响应。
@@ -25,12 +27,15 @@ class SignalManager:
     def __init__(self, owner_id: int):
         """初始化信号管理器。
 
+        使用本地 Signal() 实例而非 blinker.signal() 全局注册，
+        避免在反复创建/销毁客户端（如 shortcuts 场景）时累积废弃信号。
+
         Args:
             owner_id: 所属 Net 实例的 id，用于隔离不同实例的信号。
         """
-        self.request_before: Signal = get_signal(f"hs_net.request_before##{owner_id}")
-        self.response_after: Signal = get_signal(f"hs_net.response_after##{owner_id}")
-        self.request_retry: Signal = get_signal(f"hs_net.request_retry##{owner_id}")
+        self.request_before: Signal = Signal()
+        self.response_after: Signal = Signal()
+        self.request_retry: Signal = Signal()
 
     async def send(self, signal: Signal, *args: Any, **kwargs: Any):
         """异步发送信号并依次执行所有接收器，支持同步和异步回调。
