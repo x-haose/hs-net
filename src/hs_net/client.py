@@ -19,11 +19,11 @@ from hs_net.signals import SignalManager
 logger = logging.getLogger("hs_net")
 
 
+@functools.cache
 def _get_async_engine_map() -> dict[str, type[EngineBase]]:
-    """延迟构建异步引擎映射表。
+    """延迟构建异步引擎映射表（结果缓存，仅首次调用时导入）。
 
-    仅在首次调用时导入各引擎模块，避免在未安装可选依赖时
-    因顶层 import 失败而导致整个包不可用。
+    避免在未安装可选依赖时因顶层 import 失败而导致整个包不可用。
 
     Returns:
         引擎名称到引擎类的映射字典。

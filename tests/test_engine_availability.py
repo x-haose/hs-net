@@ -60,10 +60,4 @@ class TestEngineNotInstalledDetection:
                 mod.SyncRequestsGoEngine()
             importlib.reload(mod)
 
-    def test_install_command_in_message(self):
-        """异常消息中应包含正确的安装命令。"""
-        exc = EngineNotInstalled("aiohttp", "hs-net[aiohttp]")
-        assert "pip install hs-net[aiohttp]" in str(exc)
-
-        exc = EngineNotInstalled("curl-cffi", "hs-net[curl]")
-        assert "pip install hs-net[curl]" in str(exc)
+    # 异常消息格式测试已在 test_exceptions.py::TestEngineNotInstalled 中覆盖

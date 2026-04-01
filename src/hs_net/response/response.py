@@ -61,8 +61,9 @@ class Response:
         self.json_data = json_data
         self.request_data = request_data
 
-        self.domain: str = furl(self.url).origin
-        self.host: str = furl(self.url).host
+        _parsed_url = furl(self.url)
+        self.domain: str = _parsed_url.origin
+        self.host: str = _parsed_url.host
 
         self._selector: Selector | None = None
 

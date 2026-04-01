@@ -113,11 +113,8 @@ class SyncEngineBase(ABC):
             统一的 Response 响应对象。
         """
         if self.sem:
-            self.sem.acquire()
-            try:
+            with self.sem:
                 return self._download(request)
-            finally:
-                self.sem.release()
         return self._download(request)
 
     @property
