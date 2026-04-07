@@ -155,8 +155,14 @@ net = Net(
     retries=5,
     retry_delay=1.0,
     user_agent="chrome",
+    proxy="http://127.0.0.1:7890",
     verify=False,
+    raise_status=True,
+    allow_redirects=True,
     concurrency=10,
+    headers={"Accept-Language": "zh-CN"},
+    cookies={"token": "abc123"},
+    engine_options={"http2": True},
 )
 
 # 方式 2：NetConfig 对象
@@ -164,6 +170,7 @@ config = NetConfig(
     engine="curl_cffi",
     retries=3,
     user_agent="random",
+    headers={"Authorization": "Bearer token"},
     engine_options={"impersonate": "chrome120"},
 )
 net = Net(config=config)
