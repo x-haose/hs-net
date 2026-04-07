@@ -20,22 +20,18 @@ classifiers = [
     "Framework :: AsyncIO",
 ]
 dependencies = [
-    "pydantic>=2.9",
-    "blinker>=1.8",
     "tenacity>=8.3",
-    "furl>=2.1",
-    "fake-useragent>=1.5",
-    "parsel>=1.9",
-    "jmespath>=1.1.0",
     "httpx[http2,socks]>=0.28",
 ]
 
 [project.optional-dependencies]
+sp = ["parsel>=1.9", "jmespath>=1.1.0", "fake-useragent>=1.5"]
 aiohttp = ["aiohttp>=3.9"]
 curl = ["curl-cffi>=0.7"]
 requests = ["requests>=2.31"]
 requests-go = ["requests-go>=1.0"]
 all = [
+    "hs-net[sp]",
     "aiohttp>=3.9",
     "curl-cffi>=0.7",
     "requests>=2.31",
@@ -81,4 +77,5 @@ dev = [
     "ruff>=0.6",
     "pytest>=9.0.2",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
 ]

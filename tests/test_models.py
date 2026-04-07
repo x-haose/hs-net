@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 
 from hs_net.models import EngineEnum, RequestModel
 
@@ -76,5 +75,5 @@ class TestRequestModel:
         assert req.files == {"file": ("a.txt", b"hello")}
 
     def test_url_required(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(TypeError):
             RequestModel()

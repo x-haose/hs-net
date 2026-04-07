@@ -50,6 +50,19 @@ def html_parsing_example():
         words = resp.re(r"\b[A-Z][a-z]{5,}\b")
         print(f"正则所有匹配: {words}")
 
+        # --- to_url: 相对路径转绝对路径 ---
+        # 提取所有链接的 href，自动转为绝对 URL
+        hrefs = resp.css("a::attr(href)").getall()
+        absolute_urls = resp.to_url(hrefs)
+        print(f"to_url 转换: {hrefs} -> {absolute_urls}")
+
+        # 混合相对和绝对 URL，绝对 URL 原样保留
+        mixed = ["/relative/path", "https://example.com/absolute"]
+        print(f"to_url 混合: {resp.to_url(mixed)}")
+
+        # 单个字符串也支持
+        print(f"to_url 单个: {resp.to_url('/page')}")
+
 
 # ==================== JSON 解析（JMESPath） ====================
 
@@ -73,27 +86,28 @@ async def json_parsing_example():
 
     # 复杂 JSON 数据的 JMESPath 查询
     print("\n--- 复杂 JMESPath 查询演示 ---")
+    import json
+
     from hs_net.models import RequestModel
     from hs_net.response import Response
 
     # 模拟一个 API 响应
+    mock_data = {
+        "users": [
+            {"name": "Alice", "age": 25, "skills": ["Python", "Go"], "active": True},
+            {"name": "Bob", "age": 17, "skills": ["JavaScript"], "active": False},
+            {"name": "Charlie", "age": 30, "skills": ["Python", "Rust"], "active": True},
+            {"name": "Diana", "age": 22, "skills": ["Python", "Java"], "active": True},
+        ],
+        "total": 4,
+    }
     resp = Response(
         url="https://api.example.com/users",
         status_code=200,
-        headers={},
+        headers={"Content-Type": "application/json"},
         cookies={},
         client_cookies={},
-        content=b"",
-        text="",
-        json_data={
-            "users": [
-                {"name": "Alice", "age": 25, "skills": ["Python", "Go"], "active": True},
-                {"name": "Bob", "age": 17, "skills": ["JavaScript"], "active": False},
-                {"name": "Charlie", "age": 30, "skills": ["Python", "Rust"], "active": True},
-                {"name": "Diana", "age": 22, "skills": ["Python", "Java"], "active": True},
-            ],
-            "total": 4,
-        },
+        content=json.dumps(mock_data).encode(),
         request_data=RequestModel(url="https://api.example.com/users"),
     )
 

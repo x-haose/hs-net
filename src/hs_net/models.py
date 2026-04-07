@@ -1,7 +1,6 @@
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
-
-from pydantic import BaseModel, Field
 
 
 class EngineEnum(StrEnum):
@@ -22,7 +21,8 @@ class EngineEnum(StrEnum):
     REQUESTS_GO = "requests_go"
 
 
-class RequestModel(BaseModel):
+@dataclass
+class RequestModel:
     """请求模型，封装单次 HTTP 请求的所有参数。
 
     Attributes:
@@ -54,8 +54,8 @@ class RequestModel(BaseModel):
     allow_redirects: bool = True
     verify: bool = True
     user_agent: str | None = None
-    headers: dict[str, Any] | None = Field(default_factory=dict)
-    cookies: dict[str, Any] | None = Field(default_factory=dict)
+    headers: dict[str, Any] | None = field(default_factory=dict)
+    cookies: dict[str, Any] | None = field(default_factory=dict)
     timeout: float | None = None
     proxy: str | None = None
     retries: int | None = None

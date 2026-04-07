@@ -1,6 +1,11 @@
 """hs-net: 统一多引擎的增强型 HTTP 客户端"""
 
-__version__ = "0.2.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("hs-net")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 
 from hs_net.client import Net
 from hs_net.config import NetConfig
@@ -8,13 +13,12 @@ from hs_net.exceptions import (
     ConnectionException,
     EngineNotInstalled,
     RequestException,
-    RequestStatusException,
     RetryExhausted,
     StatusException,
     TimeoutException,
 )
 from hs_net.models import EngineEnum, RequestModel
-from hs_net.response import Response, Selector, SelectorList
+from hs_net.response import Response, Selector, SelectorList, StreamResponse
 from hs_net.shortcuts import (
     delete,
     get,
@@ -42,6 +46,7 @@ __all__ = [
     "EngineEnum",
     "RequestModel",
     "Response",
+    "StreamResponse",
     "Selector",
     "SelectorList",
     "EngineNotInstalled",
@@ -50,7 +55,6 @@ __all__ = [
     "TimeoutException",
     "ConnectionException",
     "RetryExhausted",
-    "RequestStatusException",
     # 异步快捷函数
     "request",
     "get",

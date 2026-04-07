@@ -7,7 +7,6 @@ import pytest
 from hs_net.exceptions import (
     ConnectionException,
     RequestException,
-    RequestStatusException,
     RetryExhausted,
     StatusException,
     TimeoutException,
@@ -22,9 +21,6 @@ class TestExceptionHierarchy:
         assert issubclass(TimeoutException, RequestException)
         assert issubclass(ConnectionException, RequestException)
         assert issubclass(RetryExhausted, RequestException)
-
-    def test_backward_compat_alias(self):
-        assert RequestStatusException is StatusException
 
 
 class TestRequestException:

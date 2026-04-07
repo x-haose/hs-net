@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import json as _json
 from typing import Any
-
-import jmespath
-from furl import furl
+from urllib.parse import urljoin, urlparse
 
 from hs_net.models import RequestModel
 from hs_net.response.selector import Selector, SelectorList
@@ -12,6 +11,9 @@ from hs_net.response.selector import Selector, SelectorList
 class Response:
     """统一的 HTTP 响应对象，内置选择器解析能力。
 
+    text 和 json_data 均为懒加载属性，仅在首次访问时解码/解析，
+    避免对二进制响应（如图片、文件下载）做无意义的解码操作。
+
     Attributes:
         url: 最终响应的 URL（可能经过重定向）。
         status_code: HTTP 状态码。
@@ -19,8 +21,8 @@ class Response:
         cookies: 本次响应返回的 cookies。
         client_cookies: 客户端会话级别的 cookies。
         content: 响应体的原始字节。
-        text: 响应体的文本内容。
-        json_data: 响应体解析后的 JSON 数据，解析失败为 None。
+        text: 响应体的文本内容（懒加载）。
+        json_data: 响应体解析后的 JSON 数据，解析失败为 None（懒加载）。
         request_data: 本次请求的 RequestModel。
         domain: 响应 URL 的域名（含协议）。
         host: 响应 URL 的主机名。
@@ -34,8 +36,6 @@ class Response:
         cookies: dict[str, str],
         client_cookies: dict[str, str],
         content: bytes,
-        text: str,
-        json_data: dict | list | None,
         request_data: RequestModel,
     ):
         """初始化响应对象。
@@ -47,8 +47,6 @@ class Response:
             cookies: 本次响应返回的 cookies。
             client_cookies: 客户端会话级别的 cookies。
             content: 响应体的原始字节。
-            text: 响应体的文本内容。
-            json_data: 响应体解析后的 JSON 数据。
             request_data: 本次请求的 RequestModel。
         """
         self.url = url
@@ -57,15 +55,59 @@ class Response:
         self.cookies = cookies
         self.client_cookies = client_cookies
         self.content = content
-        self.text = text
-        self.json_data = json_data
         self.request_data = request_data
 
-        _parsed_url = furl(self.url)
-        self.domain: str = _parsed_url.origin
-        self.host: str = _parsed_url.host
+        _parsed = urlparse(self.url)
+        self.domain: str = f"{_parsed.scheme}://{_parsed.netloc}"
+        self.host: str = _parsed.hostname or ""
 
+        self._text: str | None = None
+        self._json_data: dict | list | None = None
+        self._json_loaded: bool = False
         self._selector: Selector | None = None
+
+    def _detect_charset(self) -> str:
+        """从 Content-Type 响应头中提取字符编码。
+
+        Returns:
+            字符编码名称，默认 utf-8。
+        """
+        ct = self.headers.get("Content-Type", "")
+        for part in ct.split(";"):
+            part = part.strip()
+            if part.lower().startswith("charset="):
+                return part.split("=", 1)[1].strip().strip('"')
+        return "utf-8"
+
+    @property
+    def text(self) -> str:
+        """响应体的文本内容（懒加载，首次访问时解码）。
+
+        Returns:
+            解码后的文本字符串。
+        """
+        if self._text is None:
+            charset = self._detect_charset()
+            try:
+                self._text = self.content.decode(charset)
+            except (UnicodeDecodeError, LookupError):
+                self._text = self.content.decode("utf-8", errors="replace")
+        return self._text
+
+    @property
+    def json_data(self) -> dict | list | None:
+        """响应体解析后的 JSON 数据（懒加载，首次访问时解析）。
+
+        Returns:
+            解析后的 JSON 数据，解析失败返回 None。
+        """
+        if not self._json_loaded:
+            self._json_loaded = True
+            try:
+                self._json_data = _json.loads(self.content)
+            except (_json.JSONDecodeError, UnicodeDecodeError, ValueError):
+                self._json_data = None
+        return self._json_data
 
     @property
     def selector(self) -> Selector:
@@ -144,9 +186,13 @@ class Response:
             查询结果，类型取决于表达式（可能是 str、list、dict 等）。
             json_data 为 None 时返回 None。
         """
+        try:
+            import jmespath as _jmespath
+        except ImportError as e:
+            raise ImportError("JMESPath 功能需要额外安装依赖: pip install hs-net[sp]") from e
         if self.json_data is None:
             return None
-        return jmespath.search(expression, self.json_data)
+        return _jmespath.search(expression, self.json_data)
 
     def to_url(self, urls: list[str] | str) -> list[str]:
         """将相对路径转为基于当前响应 URL 的绝对路径。
@@ -159,7 +205,7 @@ class Response:
         """
         if isinstance(urls, str):
             urls = [urls]
-        return [furl(self.url).join(url).url for url in urls if not url.startswith("http")]
+        return [url if url.startswith(("http://", "https://")) else urljoin(self.url, url) for url in urls]
 
     def __repr__(self) -> str:
         return f"<Response [{self.status_code}] {self.url}>"

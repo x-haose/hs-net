@@ -5,15 +5,17 @@ import logging
 from threading import Semaphore as ThreadSemaphore
 from typing import Any
 
-from tenacity import Future, RetryCallState, Retrying, stop_after_attempt, wait_fixed, wait_random
+from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed, wait_random
 
 from hs_net._request_builder import build_request
+from hs_net._shared import format_retry_log, merge_config
 from hs_net.config import NetConfig
 from hs_net.engines.base import SyncEngineBase
 from hs_net.engines.httpx_engine import SyncHttpxEngine
-from hs_net.exceptions import RetryExhausted, StatusException
+from hs_net.exceptions import RetryExhausted
 from hs_net.models import EngineEnum, RequestModel
 from hs_net.response import Response
+from hs_net.response.stream import StreamResponse
 from hs_net.signals import SignalManager
 
 logger = logging.getLogger("hs_net")
@@ -121,23 +123,22 @@ class SyncNet:
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
-        cfg = config or NetConfig()
-
-        self._config = NetConfig(
-            engine=engine or cfg.engine,
-            base_url=base_url if base_url is not None else cfg.base_url,
-            timeout=timeout if timeout is not None else cfg.timeout,
-            retries=retries if retries is not None else cfg.retries,
-            retry_delay=retry_delay if retry_delay is not None else cfg.retry_delay,
-            user_agent=user_agent or cfg.user_agent,
-            proxy=proxy if proxy is not None else cfg.proxy,
-            verify=verify if verify is not None else cfg.verify,
-            raise_status=raise_status if raise_status is not None else cfg.raise_status,
-            allow_redirects=allow_redirects if allow_redirects is not None else cfg.allow_redirects,
-            concurrency=concurrency if concurrency is not None else cfg.concurrency,
-            headers={**cfg.headers, **(headers or {})},
-            cookies={**cfg.cookies, **(cookies or {})},
-            engine_options={**cfg.engine_options, **(engine_options or {})},
+        self._config = merge_config(
+            config,
+            engine=engine,
+            base_url=base_url,
+            timeout=timeout,
+            retries=retries,
+            retry_delay=retry_delay,
+            user_agent=user_agent,
+            proxy=proxy,
+            verify=verify,
+            raise_status=raise_status,
+            allow_redirects=allow_redirects,
+            concurrency=concurrency,
+            headers=headers,
+            cookies=cookies,
+            engine_options=engine_options,
         )
 
         sem = ThreadSemaphore(self._config.concurrency) if self._config.concurrency else None
@@ -150,8 +151,10 @@ class SyncNet:
             **self._config.engine_options,
         )
 
+        self._closed = False
+
         # 信号中间件
-        self._signals = SignalManager(id(self))
+        self._signals = SignalManager()
         self.on_request_before = self._signals.on_request_before
         self.on_response_after = self._signals.on_response_after
         self.on_request_retry = self._signals.on_request_retry
@@ -167,7 +170,16 @@ class SyncNet:
 
     def close(self):
         """关闭客户端，释放底层引擎资源。"""
+        if self._closed:
+            return
+        self._closed = True
         self._engine.close()
+
+    def __del__(self):
+        if not self._closed:
+            import warnings
+
+            warnings.warn(f"未关闭的 {self!r}，请使用 with 或手动调用 close()", ResourceWarning, stacklevel=2)
 
     def __enter__(self):
         return self
@@ -185,20 +197,11 @@ class SyncNet:
         Raises:
             RetryExhausted: 当所有重试耗尽时抛出。
         """
-        outcome: Future = retry_state.outcome
-        attempt = retry_state.attempt_number
-        exception = outcome.exception()
-        exc_type = type(exception).__name__
-        exc_msg = str(exception)
+        log_msg, attempt, exception = format_retry_log(req_data, retry_state)
 
         # 触发重试信号
         for _ in self._signals.send_sync(self._signals.request_retry, exception):
             ...
-
-        if isinstance(exception, StatusException):
-            exc_msg = f"HTTP {exception.code}"
-
-        log_msg = f"[{req_data.method}] {req_data.url} proxy={req_data.proxy} error=[{exc_type}]: {exc_msg}"
 
         if attempt == req_data.retries:
             logger.error(f"{log_msg} - {attempt} 次重试全部失败")
@@ -316,6 +319,71 @@ class SyncNet:
             wait=wait,
         )
         return retry.wraps(functools.partial(self._do_request, data))()
+
+    def stream(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict = None,
+        json_data: dict = None,
+        form_data: dict[str, Any] | list[tuple[str, str]] | str | bytes | None = None,
+        files: dict[str, Any] | list[tuple] | None = None,
+        user_agent: str = None,
+        headers: dict = None,
+        cookies: dict = None,
+        timeout: float = None,
+        proxy: str = None,
+        verify: bool = None,
+        raise_status: bool = None,
+        allow_redirects: bool = None,
+    ) -> StreamResponse:
+        """发起流式 HTTP 请求。
+
+        返回 StreamResponse 对象，支持迭代分块读取。
+        使用后必须关闭，推荐使用 with::
+
+            with sync_net.stream("GET", url) as resp:
+                for chunk in resp:
+                    f.write(chunk)
+
+        Args:
+            method: HTTP 方法（GET、POST、PUT 等）。
+            url: 请求目标 URL。
+            params: URL 查询参数。
+            json_data: JSON 请求体。
+            form_data: 表单数据。
+            files: 文件上传数据。
+            user_agent: User-Agent。
+            headers: 请求头。
+            cookies: cookies。
+            timeout: 超时时间（秒）。
+            proxy: 代理地址。
+            verify: 是否验证 SSL 证书。
+            raise_status: 是否抛出状态码异常。
+            allow_redirects: 是否允许重定向。
+
+        Returns:
+            StreamResponse 流式响应对象。
+        """
+        data = build_request(
+            self._config,
+            url=url,
+            method=method,
+            params=params,
+            json_data=json_data,
+            form_data=form_data,
+            files=files,
+            user_agent=user_agent,
+            headers=headers,
+            cookies=cookies,
+            timeout=timeout,
+            proxy=proxy,
+            verify=verify,
+            raise_status=raise_status,
+            allow_redirects=allow_redirects,
+        )
+        return self._engine.stream(data)
 
     def get(self, url: str, *, params: dict = None, **kwargs) -> Response:
         """发起 GET 请求。

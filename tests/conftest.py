@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from hs_net.models import RequestModel
@@ -54,15 +56,20 @@ def make_response(html_text):
         headers=None,
         cookies=None,
     ):
+        if json_data is not None:
+            content = json.dumps(json_data, ensure_ascii=False).encode()
+            default_headers = {"Content-Type": "application/json; charset=utf-8"}
+        else:
+            content = (text or html_text).encode()
+            default_headers = {"Content-Type": "text/html; charset=utf-8"}
+
         return Response(
             url=url,
             status_code=status_code,
-            headers=headers or {"Content-Type": "text/html"},
+            headers=headers or default_headers,
             cookies=cookies or {},
             client_cookies={},
-            content=(text or html_text).encode(),
-            text=text or html_text,
-            json_data=json_data,
+            content=content,
             request_data=RequestModel(url=url),
         )
 

@@ -4,17 +4,19 @@ from asyncio import Semaphore
 from typing import Any
 
 try:
-    from aiohttp import ClientSession, ClientTimeout, ContentTypeError, TCPConnector
+    import aiohttp
+    from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
     _HAS_AIOHTTP = True
 except ImportError:
     _HAS_AIOHTTP = False
 
-from hs_net.exceptions import EngineNotInstalled, StatusException
+from hs_net.exceptions import ConnectionException, EngineNotInstalled, StatusException, TimeoutException
 from hs_net.models import RequestModel
 from hs_net.response import Response
+from hs_net.response.stream import StreamResponse
 
-from .base import EngineBase
+from .base import EngineBase, build_response
 
 
 class AiohttpEngine(EngineBase):
@@ -73,45 +75,85 @@ class AiohttpEngine(EngineBase):
 
         Raises:
             StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
         """
-        timeout = ClientTimeout(total=request_data.timeout)
-        response = await self.client.request(
-            method=request_data.method,
-            url=request_data.url,
-            params=request_data.url_params,
-            data=request_data.form_data if not request_data.files else None,
-            json=request_data.json_data,
-            cookies=request_data.cookies,
-            headers=request_data.headers,
-            proxy=request_data.proxy,
-            timeout=timeout,
-            allow_redirects=request_data.allow_redirects,
-        )
-
-        if not response.ok and request_data.raise_status:
-            raise StatusException(code=response.status, url=request_data.url)
-
-        resp_content = await response.read()
-
         try:
-            resp_text = await response.text()
-        except UnicodeDecodeError:
-            resp_text = ""
+            timeout = ClientTimeout(total=request_data.timeout)
+            response = await self.client.request(
+                method=request_data.method,
+                url=request_data.url,
+                params=request_data.url_params,
+                data=request_data.form_data if not request_data.files else None,
+                json=request_data.json_data,
+                cookies=request_data.cookies,
+                headers=request_data.headers,
+                proxy=request_data.proxy,
+                timeout=timeout,
+                allow_redirects=request_data.allow_redirects,
+            )
 
+            resp_content = await response.read()
+            resp_cookies = {name: cookie.value for name, cookie in response.cookies.items()}
+
+            return build_response(
+                url=str(response.url),
+                status_code=response.status,
+                headers=dict(response.headers),
+                cookies=resp_cookies,
+                client_cookies=self.cookies,
+                content=resp_content,
+                request_data=request_data,
+            )
+        except TimeoutError as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except aiohttp.ClientConnectorError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e
+
+    async def _stream(self, request_data: RequestModel) -> StreamResponse:
+        """使用 aiohttp 执行异步流式 HTTP 请求。
+
+        Args:
+            request_data: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+
+        Raises:
+            StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
+        """
         try:
-            resp_json = await response.json()
-        except (ContentTypeError, UnicodeDecodeError):
-            resp_json = None
+            timeout = ClientTimeout(total=request_data.timeout)
+            response = await self.client.request(
+                method=request_data.method,
+                url=request_data.url,
+                params=request_data.url_params,
+                data=request_data.form_data if not request_data.files else None,
+                json=request_data.json_data,
+                cookies=request_data.cookies,
+                headers=request_data.headers,
+                proxy=request_data.proxy,
+                timeout=timeout,
+                allow_redirects=request_data.allow_redirects,
+            )
 
-        resp_cookies = {name: cookie.value for name, cookie in response.cookies.items()}
-        return Response(
-            url=str(response.url),
-            status_code=response.status,
-            headers=dict(response.headers),
-            cookies=resp_cookies,
-            client_cookies=self.cookies,
-            content=resp_content,
-            text=resp_text,
-            json_data=resp_json,
-            request_data=request_data,
-        )
+            if not response.ok and request_data.raise_status:
+                response.release()
+                raise StatusException(code=response.status, url=request_data.url)
+
+            return StreamResponse(
+                url=str(response.url),
+                status_code=response.status,
+                headers=dict(response.headers),
+                cookies={name: cookie.value for name, cookie in response.cookies.items()},
+                client_cookies=self.cookies,
+                request_data=request_data,
+                stream=response.content.iter_any(),
+                close_callback=response.release,
+            )
+        except TimeoutError as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except aiohttp.ClientConnectorError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e

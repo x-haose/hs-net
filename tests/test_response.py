@@ -169,10 +169,10 @@ class TestResponseToUrl:
         result = resp.to_url(["/a", "/b", "/c"])
         assert len(result) == 3
 
-    def test_absolute_url_filtered(self, make_response):
+    def test_absolute_url_preserved(self, make_response):
         resp = make_response(url="https://example.com")
         result = resp.to_url(["https://other.com/page", "/local"])
-        assert result == ["https://example.com/local"]
+        assert result == ["https://other.com/page", "https://example.com/local"]
 
     def test_string_input(self, make_response):
         resp = make_response(url="https://example.com")

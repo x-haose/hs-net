@@ -10,7 +10,10 @@ def _get_fake_ua():
     """获取 FakeUserAgent 单例（首次调用时初始化）。"""
     global _fake_ua  # noqa: PLW0603
     if _fake_ua is None:
-        from fake_useragent import FakeUserAgent
+        try:
+            from fake_useragent import FakeUserAgent
+        except ImportError as e:
+            raise ImportError("随机 User-Agent 功能需要额外安装依赖: pip install hs-net[sp]") from e
 
         _fake_ua = FakeUserAgent()
     return _fake_ua

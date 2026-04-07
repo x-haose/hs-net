@@ -123,7 +123,3 @@ class EngineNotInstalled(RequestException):
             "EngineNotInstalled",
             f"引擎 {engine_name} 需要额外安装依赖: pip install {install_package}",
         )
-
-
-# 向后兼容别名
-RequestStatusException = StatusException
