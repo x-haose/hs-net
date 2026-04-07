@@ -155,8 +155,14 @@ net = Net(
     retries=5,
     retry_delay=1.0,
     user_agent="chrome",
+    proxy="http://127.0.0.1:7890",
     verify=False,
+    raise_status=True,
+    allow_redirects=True,
     concurrency=10,
+    headers={"Accept-Language": "zh-CN"},
+    cookies={"token": "abc123"},
+    engine_options={"http2": True},
 )
 
 # 方式 2：NetConfig 对象
@@ -164,9 +170,39 @@ config = NetConfig(
     engine="curl_cffi",
     retries=3,
     user_agent="random",
+    headers={"Authorization": "Bearer token"},
     engine_options={"impersonate": "chrome120"},
 )
 net = Net(config=config)
+```
+
+每次请求也可以覆盖全局配置：
+
+```python
+async with Net(timeout=10, retries=3) as net:
+    # 这次请求用不同的超时、代理、UA
+    resp = await net.get(
+        "https://example.com",
+        params={"q": "python"},
+        timeout=30.0,
+        proxy="http://127.0.0.1:7890",
+        user_agent="MyBot/1.0",
+        headers={"X-Custom": "value"},
+        cookies={"session": "xyz"},
+        verify=False,
+        retries=5,
+        retry_delay=1.0,
+        raise_status=False,
+        allow_redirects=True,
+    )
+
+    # POST 还支持 json_data / form_data / files
+    resp = await net.post(
+        "https://api.example.com/upload",
+        json_data={"key": "value"},
+        # form_data={"field": "value"},
+        # files={"file": ("name.txt", b"content", "text/plain")},
+    )
 ```
 
 参数优先级：`请求方法参数 > 构造函数参数 > NetConfig 默认值`
