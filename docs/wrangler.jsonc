@@ -1,0 +1,7 @@
+{
+  "name": "hs-net",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./doc_build"
+  }
+}
