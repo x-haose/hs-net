@@ -6,7 +6,7 @@ from typing import Any
 from hs_net.models import EngineEnum
 
 
-@dataclass
+@dataclass(frozen=True)
 class NetConfig:
     """Net 客户端配置，通过类属性设置全局默认值。
 

@@ -7,13 +7,16 @@
 import asyncio
 
 from hs_net import (
+    ConnectionException,
     EngineEnum,
+    EngineNotInstalled,
     Net,
     NetConfig,
     RequestException,
     RetryExhausted,
     StatusException,
     SyncNet,
+    TimeoutException,
 )
 
 # ==================== NetConfig 配置类 ====================
@@ -38,22 +41,20 @@ def config_example():
         resp = net.get("/")  # 实际请求 https://example.com/
         print(f"Config 示例: {resp.status_code}")
 
-    # 方式 2: 继承自定义配置类（适合团队统一配置）
-    class MyProjectConfig(NetConfig):
-        engine: str | EngineEnum = EngineEnum.CURL_CFFI
-        base_url: str = "https://example.com"
-        retries: int = 5
-        user_agent: str = "chrome"
-        verify: bool = False
-        engine_options: dict = None
+    # 方式 2: 使用预设配置实例（适合团队统一配置）
+    # 注意: curl_cffi 需要额外安装: pip install hs-net[curl]
+    my_config = NetConfig(
+        engine=EngineEnum.CURL_CFFI,
+        base_url="https://example.com",
+        retries=5,
+        user_agent="chrome",
+        verify=False,
+        engine_options={"impersonate": "chrome120"},
+    )
 
-        def __post_init__(self):
-            if self.engine_options is None:
-                self.engine_options = {"impersonate": "chrome120"}
-
-    with SyncNet(config=MyProjectConfig()) as net:
+    with SyncNet(config=my_config) as net:
         resp = net.get("/")
-        print(f"自定义 Config: {resp.status_code}")
+        print(f"预设 Config: {resp.status_code}")
 
 
 # ==================== 构造函数参数覆盖 ====================
@@ -91,28 +92,52 @@ def request_override_example():
 def error_handling_example():
     """异常处理示例。"""
 
-    # 捕获状态码异常
+    # ---------- 1. 状态码异常 ----------
     with SyncNet(verify=False, retries=0, raise_status=True) as net:
         try:
             net.get("https://example.com/nonexistent-page-12345")
         except StatusException as e:
             print(f"状态码异常: HTTP {e.code}, URL: {e.url}")
 
-    # 捕获重试耗尽异常
+    # ---------- 2. 超时异常 ----------
+    with SyncNet(verify=False, retries=0) as net:
+        try:
+            net.get("https://httpbin.org/delay/10", timeout=0.5)
+        except TimeoutException as e:
+            print(f"超时异常: timeout={e.timeout}s, URL: {e.url}")
+
+    # ---------- 3. 连接异常 ----------
+    with SyncNet(verify=False, retries=0) as net:
+        try:
+            net.get("https://this-domain-does-not-exist-12345.com")
+        except ConnectionException as e:
+            print(f"连接异常: {e.url}")
+
+    # ---------- 4. 重试耗尽异常 ----------
     with SyncNet(verify=False, retries=2, raise_status=True) as net:
         try:
             net.get("https://example.com/nonexistent-page-12345")
         except RetryExhausted as e:
             print(f"重试耗尽: {e.attempts} 次尝试, 最后异常: {type(e.last_exception).__name__}")
 
-    # 捕获所有 hs-net 异常
+    # ---------- 5. 引擎未安装异常 ----------
+    # 注意：此示例仅在未安装 curl-cffi 时触发
+    # 如果已安装则正常请求不会报错
+    try:
+        with SyncNet(engine="curl_cffi", verify=False, retries=0) as net:
+            net.get("https://example.com")
+            print("curl_cffi 引擎已安装，正常运行")
+    except EngineNotInstalled as e:
+        print(f"引擎未安装: {e.engine_name}, 请运行: pip install {e.install_package}")
+
+    # ---------- 6. 统一捕获所有 hs-net 异常 ----------
     with SyncNet(verify=False, retries=0, raise_status=True) as net:
         try:
             net.get("https://example.com/nonexistent-page-12345")
         except RequestException as e:
-            print(f"请求异常: {e}")
+            print(f"统一异常: [{e.exception_type}] {e.exception_msg}")
 
-    # 关闭异常抛出，手动检查状态码
+    # ---------- 7. 关闭异常抛出，手动检查状态码 ----------
     with SyncNet(verify=False, retries=0, raise_status=False) as net:
         resp = net.get("https://example.com/nonexistent-page-12345")
         if not resp.ok:

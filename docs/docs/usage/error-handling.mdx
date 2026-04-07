@@ -59,17 +59,19 @@ with SyncNet(retries=3) as net:
 
 ## TimeoutException & ConnectionException
 
-:::info 当前版本
-这两个异常类已定义，但引擎暂未自动转换底层库异常。你可以在中间件中手动捕获和转换。
-:::
+```python title="timeout_connection.py"
+from hs_net import SyncNet, TimeoutException, ConnectionException
 
-```python title="timeout.py"
-from hs_net import TimeoutException, ConnectionException
+with SyncNet(verify=False, retries=0) as net:
+    try:
+        net.get("https://httpbin.org/delay/10", timeout=0.5)
+    except TimeoutException as e:
+        print(f"超时: timeout={e.timeout}s")
 
-try:
-    resp = net.get("https://example.com", timeout=0.001)
-except TimeoutException as e:
-    print(f"超时: {e.timeout}s")
+    try:
+        net.get("https://this-domain-does-not-exist-12345.com")
+    except ConnectionException as e:
+        print(f"连接失败: {e.url}")
 ```
 
 ## 统一捕获
@@ -86,10 +88,3 @@ with SyncNet() as net:
         print(f"请求异常: {e}")
 ```
 
-## 向后兼容
-
-`RequestStatusException` 是 `StatusException` 的别名，旧代码无需修改：
-
-```python
-from hs_net import RequestStatusException  # 等同于 StatusException
-```

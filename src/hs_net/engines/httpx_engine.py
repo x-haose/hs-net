@@ -1,58 +1,18 @@
 from __future__ import annotations
 
 from asyncio import Semaphore
-from json import JSONDecodeError
 from threading import Semaphore as ThreadSemaphore
 from typing import Any
 
+import httpx
 from httpx import AsyncClient, Client
 
-from hs_net.exceptions import StatusException
+from hs_net.exceptions import ConnectionException, StatusException, TimeoutException
 from hs_net.models import RequestModel
 from hs_net.response import Response
+from hs_net.response.stream import StreamResponse
 
-from .base import EngineBase, SyncEngineBase
-
-
-def _parse_response(response, request_data: RequestModel, client_cookies: dict[str, str]) -> Response:
-    """将 httpx 响应转换为统一的 Response 对象。
-
-    Args:
-        response: httpx 响应对象。
-        request_data: 请求模型。
-        client_cookies: 客户端会话 cookies。
-
-    Returns:
-        统一的 Response 响应对象。
-
-    Raises:
-        StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
-    """
-    if not response.is_success and request_data.raise_status:
-        raise StatusException(code=response.status_code, url=request_data.url)
-
-    try:
-        json_data = response.json()
-    except (JSONDecodeError, UnicodeDecodeError):
-        json_data = None
-
-    try:
-        text_data = response.text
-    except UnicodeDecodeError:
-        text_data = ""
-
-    resp_cookies = {cookie.name: cookie.value for cookie in response.cookies.jar}
-    return Response(
-        url=str(response.url),
-        status_code=response.status_code,
-        headers=dict(response.headers),
-        cookies=resp_cookies,
-        client_cookies=client_cookies,
-        content=response.content,
-        text=text_data,
-        json_data=json_data,
-        request_data=request_data,
-    )
+from .base import EngineBase, SyncEngineBase, build_response
 
 
 class HttpxEngine(EngineBase):
@@ -108,20 +68,86 @@ class HttpxEngine(EngineBase):
 
         Raises:
             StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
         """
-        request = self.client.build_request(
-            request_data.method,
-            request_data.url,
-            headers=request_data.headers,
-            timeout=request_data.timeout,
-            cookies=request_data.cookies,
-            params=request_data.url_params,
-            data=request_data.form_data,
-            json=request_data.json_data,
-            files=request_data.files,
-        )
-        response = await self.client.send(request, follow_redirects=request_data.allow_redirects)
-        return _parse_response(response, request_data, self.cookies)
+        try:
+            request = self.client.build_request(
+                request_data.method,
+                request_data.url,
+                headers=request_data.headers,
+                timeout=request_data.timeout,
+                cookies=request_data.cookies,
+                params=request_data.url_params,
+                data=request_data.form_data,
+                json=request_data.json_data,
+                files=request_data.files,
+            )
+            response = await self.client.send(request, follow_redirects=request_data.allow_redirects)
+            return build_response(
+                url=str(response.url),
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                cookies={cookie.name: cookie.value for cookie in response.cookies.jar},
+                client_cookies=self.cookies,
+                content=response.content,
+                request_data=request_data,
+            )
+        except httpx.TimeoutException as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.ConnectError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e
+
+    async def _stream(self, request_data: RequestModel) -> StreamResponse:
+        """使用 httpx 执行异步流式 HTTP 请求。
+
+        Args:
+            request_data: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+
+        Raises:
+            StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
+        """
+        try:
+            request = self.client.build_request(
+                request_data.method,
+                request_data.url,
+                headers=request_data.headers,
+                timeout=request_data.timeout,
+                cookies=request_data.cookies,
+                params=request_data.url_params,
+                data=request_data.form_data,
+                json=request_data.json_data,
+                files=request_data.files,
+            )
+            response = await self.client.send(
+                request,
+                follow_redirects=request_data.allow_redirects,
+                stream=True,
+            )
+
+            if not response.is_success and request_data.raise_status:
+                await response.aclose()
+                raise StatusException(code=response.status_code, url=request_data.url)
+
+            return StreamResponse(
+                url=str(response.url),
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                cookies={cookie.name: cookie.value for cookie in response.cookies.jar},
+                client_cookies=self.cookies,
+                request_data=request_data,
+                stream=response.aiter_bytes(),
+                close_callback=response.aclose,
+            )
+        except httpx.TimeoutException as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.ConnectError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e
 
 
 class SyncHttpxEngine(SyncEngineBase):
@@ -177,17 +203,83 @@ class SyncHttpxEngine(SyncEngineBase):
 
         Raises:
             StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
         """
-        request = self.client.build_request(
-            request_data.method,
-            request_data.url,
-            headers=request_data.headers,
-            timeout=request_data.timeout,
-            cookies=request_data.cookies,
-            params=request_data.url_params,
-            data=request_data.form_data,
-            json=request_data.json_data,
-            files=request_data.files,
-        )
-        response = self.client.send(request, follow_redirects=request_data.allow_redirects)
-        return _parse_response(response, request_data, self.cookies)
+        try:
+            request = self.client.build_request(
+                request_data.method,
+                request_data.url,
+                headers=request_data.headers,
+                timeout=request_data.timeout,
+                cookies=request_data.cookies,
+                params=request_data.url_params,
+                data=request_data.form_data,
+                json=request_data.json_data,
+                files=request_data.files,
+            )
+            response = self.client.send(request, follow_redirects=request_data.allow_redirects)
+            return build_response(
+                url=str(response.url),
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                cookies={cookie.name: cookie.value for cookie in response.cookies.jar},
+                client_cookies=self.cookies,
+                content=response.content,
+                request_data=request_data,
+            )
+        except httpx.TimeoutException as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.ConnectError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e
+
+    def _stream(self, request_data: RequestModel) -> StreamResponse:
+        """使用 httpx 执行同步流式 HTTP 请求。
+
+        Args:
+            request_data: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+
+        Raises:
+            StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
+        """
+        try:
+            request = self.client.build_request(
+                request_data.method,
+                request_data.url,
+                headers=request_data.headers,
+                timeout=request_data.timeout,
+                cookies=request_data.cookies,
+                params=request_data.url_params,
+                data=request_data.form_data,
+                json=request_data.json_data,
+                files=request_data.files,
+            )
+            response = self.client.send(
+                request,
+                follow_redirects=request_data.allow_redirects,
+                stream=True,
+            )
+
+            if not response.is_success and request_data.raise_status:
+                response.close()
+                raise StatusException(code=response.status_code, url=request_data.url)
+
+            return StreamResponse(
+                url=str(response.url),
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                cookies={cookie.name: cookie.value for cookie in response.cookies.jar},
+                client_cookies=self.cookies,
+                request_data=request_data,
+                stream=response.iter_bytes(),
+                close_callback=response.close,
+            )
+        except httpx.TimeoutException as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.ConnectError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e

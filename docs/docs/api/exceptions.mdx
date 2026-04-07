@@ -9,7 +9,8 @@ RequestException              # 基类
 ├── StatusException            # HTTP 状态码非 2xx
 ├── TimeoutException           # 请求超时
 ├── ConnectionException        # 连接失败
-└── RetryExhausted             # 重试耗尽
+├── RetryExhausted             # 重试耗尽
+└── EngineNotInstalled         # 引擎依赖未安装
 ```
 
 ## RequestException
@@ -93,9 +94,23 @@ except RetryExhausted as e:
     print(f"URL: {e.url}")
 ```
 
-## 向后兼容
+## EngineNotInstalled
+
+引擎对应的第三方库未安装时抛出，异常消息中包含安装命令。
 
 ```python
-from hs_net import RequestStatusException
-# RequestStatusException 是 StatusException 的别名
+class EngineNotInstalled(RequestException):
+    engine_name: str       # 引擎名称
+    install_package: str   # 安装包名称
+```
+
+```python
+from hs_net import EngineNotInstalled
+
+try:
+    net = SyncNet(engine="curl_cffi")
+except EngineNotInstalled as e:
+    print(e.engine_name)       # curl-cffi
+    print(e.install_package)   # hs-net[curl]
+    print(e)                   # [EngineNotInstalled]: 引擎 curl-cffi 需要额外安装依赖: pip install hs-net[curl]
 ```

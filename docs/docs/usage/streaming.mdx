@@ -1,0 +1,58 @@
+# 流式响应
+
+流式响应允许分块读取响应体，无需将整个响应加载到内存。适用于大文件下载、SSE 等场景。
+
+## 异步流式下载
+
+```python
+from hs_net import Net
+
+async with Net() as net:
+    resp = await net.stream("GET", "https://example.com/large-file.zip")
+    async with resp:
+        with open("file.zip", "wb") as f:
+            async for chunk in resp:
+                f.write(chunk)
+```
+
+## 同步流式下载
+
+```python
+from hs_net import SyncNet
+
+with SyncNet() as net:
+    with net.stream("GET", "https://example.com/large-file.zip") as resp:
+        with open("file.zip", "wb") as f:
+            for chunk in resp:
+                f.write(chunk)
+```
+
+## StreamResponse 属性
+
+流式响应对象提供基本的响应信息：
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `url` | `str` | 响应 URL |
+| `status_code` | `int` | 状态码 |
+| `headers` | `dict` | 响应头 |
+| `cookies` | `dict` | 响应 cookies |
+| `ok` | `bool` | 状态码是否为 2xx |
+
+:::warning 注意
+流式响应不支持 `text`、`json_data`、`css()`、`xpath()` 等属性和方法。
+如需解析响应内容，请使用普通的 `request()` / `get()` 方法。
+
+流式响应使用后必须关闭，推荐使用 `with` / `async with` 上下文管理器。
+:::
+
+## 多引擎支持
+
+所有引擎都支持流式响应：
+
+```python
+with SyncNet(engine="curl_cffi") as net:
+    with net.stream("GET", url) as resp:
+        for chunk in resp:
+            process(chunk)
+```

@@ -11,7 +11,7 @@ class TestSignalManager:
     """SignalManager 测试。"""
 
     def test_sync_signal(self):
-        sm = SignalManager(owner_id=999)
+        sm = SignalManager()
         results = []
 
         @sm.on_request_before
@@ -25,7 +25,7 @@ class TestSignalManager:
         assert results == ["before: test_data"]
 
     def test_sync_multiple_handlers(self):
-        sm = SignalManager(owner_id=998)
+        sm = SignalManager()
         order = []
 
         @sm.on_response_after
@@ -42,7 +42,7 @@ class TestSignalManager:
         assert order == ["h1", "h2"]
 
     def test_retry_signal(self):
-        sm = SignalManager(owner_id=997)
+        sm = SignalManager()
         caught = []
 
         @sm.on_request_retry
@@ -56,7 +56,7 @@ class TestSignalManager:
 
     @pytest.mark.asyncio
     async def test_async_signal(self):
-        sm = SignalManager(owner_id=996)
+        sm = SignalManager()
         results = []
 
         @sm.on_request_before
@@ -71,7 +71,7 @@ class TestSignalManager:
 
     @pytest.mark.asyncio
     async def test_async_mixed_handlers(self):
-        sm = SignalManager(owner_id=995)
+        sm = SignalManager()
         order = []
 
         @sm.on_response_after
@@ -88,9 +88,9 @@ class TestSignalManager:
         assert order == ["sync", "async"]
 
     def test_signal_isolation(self):
-        """不同 owner_id 的信号互不影响。"""
-        sm1 = SignalManager(owner_id=100)
-        sm2 = SignalManager(owner_id=200)
+        """不同实例的信号互不影响。"""
+        sm1 = SignalManager()
+        sm2 = SignalManager()
         results = []
 
         @sm1.on_request_before
@@ -107,7 +107,7 @@ class TestSignalManager:
         assert results == ["sm1"]
 
     def test_decorator_returns_original_function(self):
-        sm = SignalManager(owner_id=994)
+        sm = SignalManager()
 
         @sm.on_request_before
         def my_func(data):

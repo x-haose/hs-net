@@ -1,6 +1,6 @@
 [project]
 name = "hs-net"
-version = "0.1.0"
+version = "0.2.0"
 description = "统一多引擎的增强型 HTTP 客户端，内置重试、选择器、信号中间件"
 readme = "README.md"
 license = "MIT"
@@ -20,18 +20,22 @@ classifiers = [
     "Framework :: AsyncIO",
 ]
 dependencies = [
-    "pydantic>=2.9",
-    "blinker>=1.8",
     "tenacity>=8.3",
-    "furl>=2.1",
-    "fake-useragent>=1.5",
-    "parsel>=1.9",
     "httpx[http2,socks]>=0.28",
+]
+
+[project.optional-dependencies]
+sp = ["parsel>=1.9", "jmespath>=1.1.0", "fake-useragent>=1.5"]
+aiohttp = ["aiohttp>=3.9"]
+curl = ["curl-cffi>=0.7"]
+requests = ["requests>=2.31"]
+requests-go = ["requests-go>=1.0"]
+all = [
+    "hs-net[sp]",
     "aiohttp>=3.9",
     "curl-cffi>=0.7",
     "requests>=2.31",
     "requests-go>=1.0",
-    "jmespath>=1.1.0",
 ]
 
 [project.urls]
@@ -66,10 +70,12 @@ skips = [
 
 [dependency-groups]
 dev = [
+    "hs-net[all]",
     "bandit[toml]>=1.7",
     "pre-commit>=4.2",
     "twine>=6.1",
     "ruff>=0.6",
     "pytest>=9.0.2",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
 ]

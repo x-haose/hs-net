@@ -1,7 +1,22 @@
-from fake_useragent import FakeUserAgent
+from __future__ import annotations
 
 _FAKE_UA_ATTRS = frozenset({"random", "chrome", "googlechrome", "edge", "firefox", "ff", "safari"})
-_fake_ua = FakeUserAgent()
+
+# 延迟初始化，避免 import hs_net 时立即加载 UA 数据库
+_fake_ua = None
+
+
+def _get_fake_ua():
+    """获取 FakeUserAgent 单例（首次调用时初始化）。"""
+    global _fake_ua  # noqa: PLW0603
+    if _fake_ua is None:
+        try:
+            from fake_useragent import FakeUserAgent
+        except ImportError as e:
+            raise ImportError("随机 User-Agent 功能需要额外安装依赖: pip install hs-net[sp]") from e
+
+        _fake_ua = FakeUserAgent()
+    return _fake_ua
 
 
 def resolve_user_agent(ua: str | None) -> str | None:
@@ -17,5 +32,5 @@ def resolve_user_agent(ua: str | None) -> str | None:
         解析后的 User-Agent 字符串，传入 None 则返回 None。
     """
     if ua and ua in _FAKE_UA_ATTRS:
-        return getattr(_fake_ua, ua)
+        return getattr(_get_fake_ua(), ua)
     return ua

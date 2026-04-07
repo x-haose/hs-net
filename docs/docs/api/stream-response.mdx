@@ -1,0 +1,39 @@
+# StreamResponse
+
+流式 HTTP 响应对象，支持分块迭代读取响应体。
+
+## 属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `url` | `str` | 最终响应的 URL |
+| `status_code` | `int` | HTTP 状态码 |
+| `headers` | `dict[str, Any]` | 响应头 |
+| `cookies` | `dict[str, str]` | 本次响应的 cookies |
+| `client_cookies` | `dict[str, str]` | 会话级 cookies |
+| `ok` | `bool` | 状态码是否在 2xx 范围 |
+| `request_data` | `RequestModel` | 请求参数 |
+
+## 迭代
+
+```python
+# 异步迭代
+async for chunk in resp:
+    f.write(chunk)
+
+# 同步迭代
+for chunk in resp:
+    f.write(chunk)
+```
+
+## 关闭
+
+```python
+# 推荐：上下文管理器
+async with resp:
+    ...
+
+# 手动关闭
+await resp.aclose()  # 异步
+resp.close()         # 同步
+```

@@ -140,3 +140,27 @@ with SyncNet(config=config, headers={"X-Instance": "2"}) as net:
 ```
 
 同名 key 以更高优先级的值为准。
+
+## 自定义配置
+
+`NetConfig` 使用 `frozen=True`（不可变），不支持继承覆盖。如需团队统一配置，直接实例化即可：
+
+```python title="team_config.py"
+from hs_net import NetConfig, EngineEnum, Net, SyncNet
+
+# 团队统一配置
+my_config = NetConfig(
+    engine=EngineEnum.CURL_CFFI,
+    retries=5,
+    user_agent="chrome",
+    verify=False,
+)
+
+# 异步
+async with Net(config=my_config) as net:
+    resp = await net.get("https://example.com")
+
+# 同步
+with SyncNet(config=my_config) as net:
+    resp = net.get("https://example.com")
+```

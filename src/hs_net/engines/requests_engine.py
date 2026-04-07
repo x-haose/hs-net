@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from json import JSONDecodeError
 from threading import Semaphore as ThreadSemaphore
 from typing import Any
 
-from requests import Session
-from requests.utils import cookiejar_from_dict, dict_from_cookiejar
+try:
+    import requests
+    from requests import Session
+    from requests.utils import cookiejar_from_dict, dict_from_cookiejar
 
-from hs_net.exceptions import StatusException
+    _HAS_REQUESTS = True
+except ImportError:
+    _HAS_REQUESTS = False
+
+from hs_net.exceptions import ConnectionException, EngineNotInstalled, StatusException, TimeoutException
 from hs_net.models import RequestModel
 from hs_net.response import Response
+from hs_net.response.stream import StreamResponse
 
-from .base import SyncEngineBase
+from .base import SyncEngineBase, build_proxies_dict, build_response
 
 
 class SyncRequestsEngine(SyncEngineBase):
@@ -34,6 +40,9 @@ class SyncRequestsEngine(SyncEngineBase):
             verify: 是否验证 SSL 证书。
             **engine_options: requests 特定配置。
         """
+        if not _HAS_REQUESTS:
+            raise EngineNotInstalled("requests", "hs-net[requests]")
+
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         self.client = Session()
@@ -65,39 +74,83 @@ class SyncRequestsEngine(SyncEngineBase):
 
         Raises:
             StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
         """
-        proxies = {"https": request_data.proxy, "http": request_data.proxy} if request_data.proxy else None
-
-        response = self.client.request(
-            method=request_data.method,
-            url=request_data.url,
-            params=request_data.url_params,
-            data=request_data.form_data if not request_data.files else None,
-            json=request_data.json_data,
-            files=request_data.files,
-            cookies=request_data.cookies,
-            headers=request_data.headers,
-            proxies=proxies,
-            timeout=request_data.timeout,
-            allow_redirects=request_data.allow_redirects,
-        )
-
-        if not response.ok and request_data.raise_status:
-            raise StatusException(code=response.status_code, url=request_data.url)
-
         try:
-            resp_json = response.json()
-        except (JSONDecodeError, UnicodeDecodeError):
-            resp_json = None
+            response = self.client.request(
+                method=request_data.method,
+                url=request_data.url,
+                params=request_data.url_params,
+                data=request_data.form_data if not request_data.files else None,
+                json=request_data.json_data,
+                files=request_data.files,
+                cookies=request_data.cookies,
+                headers=request_data.headers,
+                proxies=build_proxies_dict(request_data.proxy),
+                timeout=request_data.timeout,
+                allow_redirects=request_data.allow_redirects,
+            )
 
-        return Response(
-            url=str(response.url),
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            cookies=dict_from_cookiejar(response.cookies),
-            client_cookies=self.cookies,
-            content=response.content,
-            text=response.text,
-            json_data=resp_json,
-            request_data=request_data,
-        )
+            return build_response(
+                url=str(response.url),
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                cookies=dict_from_cookiejar(response.cookies),
+                client_cookies=self.cookies,
+                content=response.content,
+                request_data=request_data,
+            )
+        except requests.Timeout as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.ConnectionError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e
+
+    def _stream(self, request_data: RequestModel) -> StreamResponse:
+        """使用 requests 执行同步流式 HTTP 请求。
+
+        Args:
+            request_data: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+
+        Raises:
+            StatusException: 当 raise_status 为 True 且状态码非 2xx 时抛出。
+            TimeoutException: 当请求超时时抛出。
+            ConnectionException: 当连接失败时抛出。
+        """
+        try:
+            response = self.client.request(
+                method=request_data.method,
+                url=request_data.url,
+                params=request_data.url_params,
+                data=request_data.form_data if not request_data.files else None,
+                json=request_data.json_data,
+                files=request_data.files,
+                cookies=request_data.cookies,
+                headers=request_data.headers,
+                proxies=build_proxies_dict(request_data.proxy),
+                timeout=request_data.timeout,
+                allow_redirects=request_data.allow_redirects,
+                stream=True,
+            )
+
+            if not response.ok and request_data.raise_status:
+                response.close()
+                raise StatusException(code=response.status_code, url=request_data.url)
+
+            return StreamResponse(
+                url=str(response.url),
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                cookies=dict_from_cookiejar(response.cookies),
+                client_cookies=self.cookies,
+                request_data=request_data,
+                stream=response.iter_content(chunk_size=8192),
+                close_callback=response.close,
+            )
+        except requests.Timeout as e:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.ConnectionError as e:
+            raise ConnectionException(url=request_data.url, message=str(e)) from e

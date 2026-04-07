@@ -5,8 +5,56 @@ from asyncio import Semaphore
 from threading import Semaphore as ThreadSemaphore
 from typing import Any
 
+from hs_net.exceptions import StatusException
 from hs_net.models import RequestModel
 from hs_net.response import Response
+from hs_net.response.stream import StreamResponse
+
+
+def build_response(
+    *,
+    url: str,
+    status_code: int,
+    headers: dict,
+    cookies: dict[str, str],
+    client_cookies: dict[str, str],
+    content: bytes,
+    request_data: RequestModel,
+) -> Response:
+    """统一构造 Response 对象，包含状态码检查。"""
+    if not (200 <= status_code < 300) and request_data.raise_status:
+        raise StatusException(code=status_code, url=request_data.url)
+    return Response(
+        url=url,
+        status_code=status_code,
+        headers=headers,
+        cookies=cookies,
+        client_cookies=client_cookies,
+        content=content,
+        request_data=request_data,
+    )
+
+
+def build_proxies_dict(proxy: str | None) -> dict[str, str] | None:
+    """构建代理字典。"""
+    return {"https": proxy, "http": proxy} if proxy else None
+
+
+def build_common_request_kwargs(request_data: RequestModel) -> dict:
+    """构建 curl-cffi / requests / requests-go 共用的请求参数。"""
+    return {
+        "method": request_data.method,
+        "url": request_data.url,
+        "params": request_data.url_params,
+        "data": request_data.form_data if not request_data.files else None,
+        "json": request_data.json_data,
+        "files": request_data.files,
+        "cookies": request_data.cookies,
+        "headers": request_data.headers,
+        "proxies": build_proxies_dict(request_data.proxy),
+        "timeout": request_data.timeout,
+        "allow_redirects": request_data.allow_redirects,
+    }
 
 
 class EngineBase(ABC):
@@ -72,6 +120,32 @@ class EngineBase(ABC):
         ...
 
     @abstractmethod
+    async def _stream(self, request: RequestModel) -> StreamResponse:
+        """执行流式 HTTP 请求，由子类实现。
+
+        Args:
+            request: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+        """
+        ...
+
+    async def stream(self, request: RequestModel) -> StreamResponse:
+        """发起流式请求，受信号量控制。
+
+        Args:
+            request: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+        """
+        if self.sem:
+            async with self.sem:
+                return await self._stream(request)
+        return await self._stream(request)
+
+    @abstractmethod
     async def close(self) -> None:
         """关闭引擎，释放底层 HTTP 客户端资源。"""
         ...
@@ -113,11 +187,8 @@ class SyncEngineBase(ABC):
             统一的 Response 响应对象。
         """
         if self.sem:
-            self.sem.acquire()
-            try:
+            with self.sem:
                 return self._download(request)
-            finally:
-                self.sem.release()
         return self._download(request)
 
     @property
@@ -141,6 +212,32 @@ class SyncEngineBase(ABC):
             统一的 Response 响应对象。
         """
         ...
+
+    @abstractmethod
+    def _stream(self, request: RequestModel) -> StreamResponse:
+        """执行流式 HTTP 请求，由子类实现。
+
+        Args:
+            request: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+        """
+        ...
+
+    def stream(self, request: RequestModel) -> StreamResponse:
+        """发起流式请求，受信号量控制。
+
+        Args:
+            request: 请求模型。
+
+        Returns:
+            StreamResponse 流式响应对象。
+        """
+        if self.sem:
+            with self.sem:
+                return self._stream(request)
+        return self._stream(request)
 
     @abstractmethod
     def close(self) -> None:

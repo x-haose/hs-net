@@ -1,0 +1,127 @@
+# 快捷函数
+
+无需实例化 `Net` / `SyncNet`，直接通过模块级函数发起 HTTP 请求。
+
+## 基本用法
+
+### 异步
+
+```python title="async_shortcuts.py"
+import asyncio
+import hs_net
+
+async def main():
+    # GET 请求
+    resp = await hs_net.get("https://example.com")
+    print(resp.text)
+
+    # POST 请求
+    resp = await hs_net.post(
+        "https://api.example.com/data",
+        json_data={"name": "test", "value": 42},
+    )
+    print(resp.json_data)
+
+asyncio.run(main())
+```
+
+### 同步
+
+```python title="sync_shortcuts.py"
+import hs_net
+
+# GET 请求
+resp = hs_net.sync_get("https://example.com")
+print(resp.text)
+
+# POST 请求
+resp = hs_net.sync_post(
+    "https://api.example.com/data",
+    json_data={"name": "test", "value": 42},
+)
+print(resp.json_data)
+```
+
+## 指定引擎
+
+通过 `engine` 参数切换引擎：
+
+```python title="engine_shortcuts.py"
+# 使用 curl-cffi 引擎发起请求
+resp = await hs_net.get("https://example.com", engine="curl_cffi")
+
+# 同步版
+resp = hs_net.sync_get("https://example.com", engine="requests")
+```
+
+## 传递参数
+
+快捷函数支持所有 `Net.request()` / `SyncNet.request()` 的参数：
+
+```python title="params_shortcuts.py"
+# 查询参数
+resp = await hs_net.get("https://api.example.com/search", params={"q": "python"})
+
+# 自定义请求头
+resp = await hs_net.get(
+    "https://api.example.com/data",
+    headers={"Authorization": "Bearer token"},
+)
+
+# 超时和重试
+resp = await hs_net.get(
+    "https://api.example.com/data",
+    timeout=10.0,
+    retries=5,
+    retry_delay=1.0,
+)
+
+# 代理
+resp = await hs_net.get(
+    "https://example.com",
+    proxy="http://127.0.0.1:7890",
+)
+```
+
+## 可用函数
+
+### 异步函数
+
+| 函数 | 说明 |
+|------|------|
+| `hs_net.request(method, url, **kwargs)` | 通用请求 |
+| `hs_net.get(url, **kwargs)` | GET 请求 |
+| `hs_net.post(url, **kwargs)` | POST 请求 |
+| `hs_net.put(url, **kwargs)` | PUT 请求 |
+| `hs_net.patch(url, **kwargs)` | PATCH 请求 |
+| `hs_net.delete(url, **kwargs)` | DELETE 请求 |
+| `hs_net.head(url, **kwargs)` | HEAD 请求 |
+| `hs_net.options(url, **kwargs)` | OPTIONS 请求 |
+
+### 同步函数
+
+| 函数 | 说明 |
+|------|------|
+| `hs_net.sync_request(method, url, **kwargs)` | 通用请求 |
+| `hs_net.sync_get(url, **kwargs)` | GET 请求 |
+| `hs_net.sync_post(url, **kwargs)` | POST 请求 |
+| `hs_net.sync_put(url, **kwargs)` | PUT 请求 |
+| `hs_net.sync_patch(url, **kwargs)` | PATCH 请求 |
+| `hs_net.sync_delete(url, **kwargs)` | DELETE 请求 |
+| `hs_net.sync_head(url, **kwargs)` | HEAD 请求 |
+| `hs_net.sync_options(url, **kwargs)` | OPTIONS 请求 |
+
+## 快捷函数 vs Net/SyncNet
+
+| | 快捷函数 | Net / SyncNet |
+|---|---|---|
+| 连接复用 | ❌ 每次新建 | ✅ 复用连接 |
+| 中间件 | ❌ 不支持 | ✅ 支持 |
+| 并发控制 | ❌ 不支持 | ✅ 支持 |
+| Cookie 保持 | ❌ 不保持 | ✅ 自动保持 |
+| 适用场景 | 一次性请求、脚本 | 爬虫、API 客户端 |
+
+:::tip 选择建议
+- **简单脚本、测试、一次性请求** → 用快捷函数
+- **爬虫、API 客户端、需要登录态** → 用 `Net` / `SyncNet`
+:::

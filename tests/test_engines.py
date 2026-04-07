@@ -15,24 +15,33 @@ from hs_net.models import EngineEnum
 from hs_net.sync_client import _resolve_sync_engine_cls
 
 
+def _same_class(cls_a: type, cls_b: type) -> bool:
+    """判断两个类是否为同一引擎类。
+
+    使用限定名和模块路径比较，而非对象 identity，
+    因为 importlib.reload() 会导致同一类在不同测试间产生不同的对象引用。
+    """
+    return cls_a.__qualname__ == cls_b.__qualname__ and cls_a.__module__ == cls_b.__module__
+
+
 class TestAsyncEngineResolve:
     """异步引擎解析测试。"""
 
     def test_httpx(self):
-        assert _resolve_async_engine_cls("httpx") is HttpxEngine
+        assert _same_class(_resolve_async_engine_cls("httpx"), HttpxEngine)
 
     def test_aiohttp(self):
-        assert _resolve_async_engine_cls("aiohttp") is AiohttpEngine
+        assert _same_class(_resolve_async_engine_cls("aiohttp"), AiohttpEngine)
 
     def test_curl_cffi(self):
-        assert _resolve_async_engine_cls("curl_cffi") is CurlCffiEngine
+        assert _same_class(_resolve_async_engine_cls("curl_cffi"), CurlCffiEngine)
 
     def test_requests_go(self):
-        assert _resolve_async_engine_cls("requests_go") is RequestsGoEngine
+        assert _same_class(_resolve_async_engine_cls("requests_go"), RequestsGoEngine)
 
     def test_enum(self):
-        assert _resolve_async_engine_cls(EngineEnum.HTTPX) is HttpxEngine
-        assert _resolve_async_engine_cls(EngineEnum.AIOHTTP) is AiohttpEngine
+        assert _same_class(_resolve_async_engine_cls(EngineEnum.HTTPX), HttpxEngine)
+        assert _same_class(_resolve_async_engine_cls(EngineEnum.AIOHTTP), AiohttpEngine)
 
     def test_custom_engine_class(self):
         assert _resolve_async_engine_cls(HttpxEngine) is HttpxEngine
@@ -50,20 +59,20 @@ class TestSyncEngineResolve:
     """同步引擎解析测试。"""
 
     def test_httpx(self):
-        assert _resolve_sync_engine_cls("httpx") is SyncHttpxEngine
+        assert _same_class(_resolve_sync_engine_cls("httpx"), SyncHttpxEngine)
 
     def test_curl_cffi(self):
-        assert _resolve_sync_engine_cls("curl_cffi") is SyncCurlCffiEngine
+        assert _same_class(_resolve_sync_engine_cls("curl_cffi"), SyncCurlCffiEngine)
 
     def test_requests(self):
-        assert _resolve_sync_engine_cls("requests") is SyncRequestsEngine
+        assert _same_class(_resolve_sync_engine_cls("requests"), SyncRequestsEngine)
 
     def test_requests_go(self):
-        assert _resolve_sync_engine_cls("requests_go") is SyncRequestsGoEngine
+        assert _same_class(_resolve_sync_engine_cls("requests_go"), SyncRequestsGoEngine)
 
     def test_enum(self):
-        assert _resolve_sync_engine_cls(EngineEnum.HTTPX) is SyncHttpxEngine
-        assert _resolve_sync_engine_cls(EngineEnum.REQUESTS) is SyncRequestsEngine
+        assert _same_class(_resolve_sync_engine_cls(EngineEnum.HTTPX), SyncHttpxEngine)
+        assert _same_class(_resolve_sync_engine_cls(EngineEnum.REQUESTS), SyncRequestsEngine)
 
     def test_custom_engine_class(self):
         assert _resolve_sync_engine_cls(SyncHttpxEngine) is SyncHttpxEngine

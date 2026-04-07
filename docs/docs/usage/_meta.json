@@ -1,1 +1,1 @@
-["basic-request", "http-methods", "selectors", "middleware", "multi-engine", "error-handling", "advanced"]
+["basic-request", "shortcuts", "http-methods", "selectors", "streaming", "middleware", "multi-engine", "error-handling", "advanced"]
