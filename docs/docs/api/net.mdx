@@ -106,6 +106,27 @@ async def head(url: str, *, params: dict = None, **kwargs) -> Response
 async def options(url: str, **kwargs) -> Response
 ```
 
+### stream
+
+```python
+async def stream(
+    method: str,
+    url: str,
+    **kwargs,
+) -> StreamResponse
+```
+
+发起流式请求，返回 [`StreamResponse`](/api/stream-response) 对象，支持分块迭代读取响应体。
+
+```python title="stream_example.py"
+async with Net() as net:
+    resp = await net.stream("GET", "https://example.com/large-file")
+    async with resp:
+        with open("file.zip", "wb") as f:
+            async for chunk in resp:
+                f.write(chunk)
+```
+
 ### close
 
 ```python

@@ -47,6 +47,23 @@ def delete(url, **kwargs) -> Response
 def head(url, *, params=None, **kwargs) -> Response
 def options(url, **kwargs) -> Response
 def close() -> None
+def stream(method, url, **kwargs) -> StreamResponse
+```
+
+### stream
+
+```python
+def stream(method: str, url: str, **kwargs) -> StreamResponse
+```
+
+发起流式请求，返回 [`StreamResponse`](/api/stream-response) 对象。使用 `with` 上下文管理器确保资源释放。
+
+```python title="sync_stream.py"
+with SyncNet() as net:
+    with net.stream("GET", "https://example.com/large-file") as resp:
+        with open("file.zip", "wb") as f:
+            for chunk in resp:
+                f.write(chunk)
 ```
 
 ## 可用引擎

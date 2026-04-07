@@ -114,10 +114,3 @@ except EngineNotInstalled as e:
     print(e.install_package)   # hs-net[curl]
     print(e)                   # [EngineNotInstalled]: 引擎 curl-cffi 需要额外安装依赖: pip install hs-net[curl]
 ```
-
-## 向后兼容
-
-```python
-from hs_net import RequestStatusException
-# RequestStatusException 是 StatusException 的别名
-```
