@@ -1,0 +1,564 @@
+# Instincts generated from https://github.com/x-haose/hs-net
+# Generated: 2026-04-07T13:45:07.866Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: hs-net-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, docs, fix, refactor, chore
+
+## Evidence
+
+- 15 commits analyzed
+- Detected conventional commit pattern
+- Examples: fix: 升级 GitHub Actions 依赖到最新版本，消除 Node.js 20 废弃警告, feat: 新增 EngineNotInstalled 异常，为可选依赖报错提供友好提示
+
+---
+id: hs-net-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Commit Length
+
+## Action
+
+Keep commit messages concise (~35 characters)
+
+## Evidence
+
+- Average commit message length: 35 chars
+- Based on 15 commits
+
+---
+id: hs-net-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Naming Files
+
+## Action
+
+Use snake_case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: snake_case
+
+---
+id: hs-net-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: hs-net-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: hs-net-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: hs-net-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: hs-net-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~10x per month
+- Files: **/*.test.*
+
+---
+id: hs-net-workflow-feature-addition-with-tests
+trigger: "when doing feature addition with tests"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Workflow Feature Addition With Tests
+
+## Action
+
+Follow the feature-addition-with-tests workflow:
+1. Implement feature in a new or existing module (e.g., exceptions.py, shortcuts.py).
+2. Update __init__.py to expose or register the new feature.
+3. Add or update tests for the new feature.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/hs_net/__init__.py, src/hs_net/exceptions.py, src/hs_net/shortcuts.py
+
+---
+id: hs-net-workflow-engine-module-change-with-tests
+trigger: "when doing engine module change with tests"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Workflow Engine Module Change With Tests
+
+## Action
+
+Follow the engine-module-change-with-tests workflow:
+1. Modify one or more engine modules (e.g., aiohttp_engine.py, requests_engine.py).
+2. Update client.py and/or sync_client.py to reflect engine changes.
+3. Update or create tests related to engine behavior.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/hs_net/engines/aiohttp_engine.py, src/hs_net/engines/curl_cffi_engine.py, src/hs_net/engines/requests_engine.py
+
+---
+id: hs-net-workflow-documentation-update-for-release-or-feature
+trigger: "when doing documentation update for release or feature"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Workflow Documentation Update For Release Or Feature
+
+## Action
+
+Follow the documentation-update-for-release-or-feature workflow:
+1. Update README.md with new features, installation, or usage instructions.
+2. Update docs site files (mdx, md, _meta.json) to document new APIs, guides, or usage patterns.
+3. Update or add example scripts to demonstrate new features or changes.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: README.md, docs/docs/api/*.mdx, docs/docs/guide/*.mdx
+
+---
+id: hs-net-workflow-dependency-and-config-update
+trigger: "when doing dependency and config update"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/x-haose/hs-net
+---
+
+# Hs Net Workflow Dependency And Config Update
+
+## Action
+
+Follow the dependency-and-config-update workflow:
+1. Modify pyproject.toml and/or uv.lock to update dependencies or version numbers.
+2. Update .github/workflows/*.yml for CI/CD changes.
+3. Update __init__.py for version bump if needed.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: pyproject.toml, uv.lock, .github/workflows/ci.yml
+
+---
+id: hs-net-instinct-file-naming
+trigger: "When creating or renaming files in the codebase"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct File Naming
+
+## Action
+
+Use snake_case for all file names
+
+## Evidence
+
+- Pattern in files: src/hs_net/exceptions.py, src/hs_net/shortcuts.py
+
+---
+id: hs-net-instinct-function-naming
+trigger: "When defining new functions"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Function Naming
+
+## Action
+
+Use camelCase for function names
+
+## Evidence
+
+- Naming convention stated in analysis
+- Pattern in src/hs_net/*.py
+
+---
+id: hs-net-instinct-class-naming
+trigger: "When defining new classes"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Class Naming
+
+## Action
+
+Use PascalCase for class names
+
+## Evidence
+
+- Naming convention stated in analysis
+- Pattern in src/hs_net/*.py
+
+---
+id: hs-net-instinct-constant-naming
+trigger: "When defining constants"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constants
+
+## Evidence
+
+- Naming convention stated in analysis
+
+---
+id: hs-net-instinct-import-style
+trigger: "When importing modules within the package"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Import style stated in analysis
+- Pattern in src/hs_net/*.py
+
+---
+id: hs-net-instinct-export-style
+trigger: "When exporting functions or classes from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Export Style
+
+## Action
+
+Use named exports (explicitly define __all__)
+
+## Evidence
+
+- Export style stated in analysis
+
+---
+id: hs-net-instinct-test-file-pattern
+trigger: "When creating new test files"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Test File Pattern
+
+## Action
+
+Name test files with the pattern *.test.ts
+
+## Evidence
+
+- Testing pattern stated in analysis
+- Pattern in tests/test_exceptions.py, tests/test_shortcuts.py
+
+---
+id: hs-net-instinct-test-type
+trigger: "When writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Test Type
+
+## Action
+
+Write unit tests for new features or modules
+
+## Evidence
+
+- Testing type stated in analysis
+- Pattern in tests/test_exceptions.py, tests/test_shortcuts.py
+
+---
+id: hs-net-instinct-test-location
+trigger: "When adding tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Test Location
+
+## Action
+
+Place test files in the separate tests/ directory
+
+## Evidence
+
+- Pattern in folder structure
+- Pattern in tests/test_exceptions.py
+
+---
+id: hs-net-instinct-commit-format
+trigger: "When making a commit"
+confidence: 0.95
+domain: git
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Commit Format
+
+## Action
+
+Use Conventional Commits format with prefixes: feat, fix, docs, refactor, chore
+
+## Evidence
+
+- Seen in commit: fix: 升级 GitHub Actions 依赖到最新版本，消除 Node.js 20 废弃警告
+- Seen in commit: feat: 新增 EngineNotInstalled 异常，为可选依赖报错提供友好提示
+
+---
+id: hs-net-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Commit Length
+
+## Action
+
+Keep commit message length around 35 characters on average
+
+## Evidence
+
+- Average length stated in analysis
+- Pattern in commit examples
+
+---
+id: hs-net-instinct-feature-addition-workflow
+trigger: "When someone wants to add a new feature or API to the core library"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Feature Addition Workflow
+
+## Action
+
+Implement feature in a new or existing module, update __init__.py to expose it, and add or update corresponding tests
+
+## Evidence
+
+- Workflow: feature-addition-with-tests
+- Seen in commits: feat: 新增 EngineNotInstalled 异常，为可选依赖报错提供友好提示; tests/test_exceptions.py
+
+---
+id: hs-net-instinct-engine-module-change-workflow
+trigger: "When someone wants to improve or refactor engine modules, such as changing import strategies or dependency management"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Engine Module Change Workflow
+
+## Action
+
+Modify engine modules, update client modules, and update or create related tests
+
+## Evidence
+
+- Workflow: engine-module-change-with-tests
+- Pattern in files: src/hs_net/engines/*.py, tests/test_engines.py
+
+---
+id: hs-net-instinct-docs-update-workflow
+trigger: "When someone releases a new version or adds significant features that require documentation updates"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Docs Update Workflow
+
+## Action
+
+Update README.md, docs site files, and example scripts to reflect changes
+
+## Evidence
+
+- Workflow: documentation-update-for-release-or-feature
+- Seen in commit: docs: 更新 README，新增引擎能力矩阵、可选安装说明和快捷函数示例
+
+---
+id: hs-net-instinct-dependency-config-update-workflow
+trigger: "When someone needs to add/remove dependencies, update version numbers, or change CI configuration"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: x-haose/hs-net
+---
+
+# Hs Net Instinct Dependency Config Update Workflow
+
+## Action
+
+Update pyproject.toml, uv.lock, CI/CD workflow files, and bump version in __init__.py if needed
+
+## Evidence
+
+- Workflow: dependency-and-config-update
+- Seen in commit: chore: 版本号升级到 0.2.0
+
