@@ -25,7 +25,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sp = ["parsel>=1.9", "jmespath>=1.1.0", "fake-useragent>=1.5"]
+sp = [
+    "parsel>=1.9",
+ "jmespath>=1.1.0",
+ "fake-useragent>=1.5",
+ "pyrate-limiter>=3.0",
+]
 aiohttp = ["aiohttp>=3.9"]
 curl = ["curl-cffi>=0.7"]
 requests = ["requests>=2.31"]

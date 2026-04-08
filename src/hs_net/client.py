@@ -14,6 +14,7 @@ from hs_net.engines.base import EngineBase
 from hs_net.engines.httpx_engine import HttpxEngine
 from hs_net.exceptions import RetryExhausted
 from hs_net.models import EngineEnum, RequestModel
+from hs_net.rate_limit import RateLimitConfig, RateLimitManager
 from hs_net.response import Response
 from hs_net.response.stream import StreamResponse
 from hs_net.signals import SignalManager
@@ -69,6 +70,15 @@ def _resolve_async_engine_cls(engine: str | EngineEnum | type[EngineBase]) -> ty
     raise ValueError(f"不支持的异步引擎: {engine_value}")
 
 
+def _build_rate_limiter(rate_limit) -> RateLimitManager | None:
+    """根据 rate_limit 配置构建异步限速管理器。"""
+    if rate_limit is None:
+        return None
+    if isinstance(rate_limit, int | float):
+        rate_limit = RateLimitConfig(rate=int(rate_limit))
+    return RateLimitManager(rate_limit)
+
+
 class Net:
     """
     统一的异步 HTTP 客户端
@@ -101,6 +111,7 @@ class Net:
         verify: bool = None,
         raise_status: bool = None,
         allow_redirects: bool = None,
+        rate_limit: int | float | RateLimitConfig = None,
         concurrency: int = None,
         headers: dict[str, Any] = None,
         cookies: dict[str, Any] = None,
@@ -123,6 +134,7 @@ class Net:
             verify: 是否验证 SSL 证书。
             raise_status: 状态码非 2xx 时是否抛出异常。
             allow_redirects: 是否允许自动重定向。
+            rate_limit: 速率限制，支持 int/float（每秒请求数）或 RateLimitConfig。
             concurrency: 最大并发数，为 None 则不限制。
             headers: 全局默认请求头。
             cookies: 全局默认 cookies。
@@ -141,6 +153,7 @@ class Net:
             verify=verify,
             raise_status=raise_status,
             allow_redirects=allow_redirects,
+            rate_limit=rate_limit,
             concurrency=concurrency,
             headers=headers,
             cookies=cookies,
@@ -158,6 +171,7 @@ class Net:
         )
 
         self._closed = False
+        self._rate_limiter = _build_rate_limiter(self._config.rate_limit)
 
         # 信号中间件
         self._signals = SignalManager()
@@ -216,7 +230,7 @@ class Net:
         logger.warning(f"{log_msg} - 第 {attempt} 次重试")
 
     async def _do_request(self, data: RequestModel) -> Response:
-        """执行单次请求，包含请求前/响应后信号中间件。
+        """执行单次请求，包含速率限制和请求前/响应后信号中间件。
 
         Args:
             data: 请求模型。
@@ -224,6 +238,10 @@ class Net:
         Returns:
             Response 响应对象。
         """
+        # 速率限制
+        if self._rate_limiter:
+            await self._rate_limiter.acquire(data.url)
+
         # 请求前信号
         async for _receiver, result in self._signals.send(self._signals.request_before, data):
             if isinstance(result, RequestModel):

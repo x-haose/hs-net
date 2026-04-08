@@ -12,6 +12,7 @@ from hs_net import (
     EngineNotInstalled,
     Net,
     NetConfig,
+    RateLimitConfig,
     RequestException,
     RetryExhausted,
     StatusException,
@@ -163,6 +164,53 @@ async def concurrency_example():
         print(f"全部成功: {all(r.ok for r in results)}")
 
 
+# ==================== 速率限制 ====================
+
+
+def rate_limit_basic_example():
+    """基础速率限制 — 全局每秒 N 个请求。"""
+    # 最简写法：每秒最多 3 个请求
+    with SyncNet(rate_limit=3, verify=False, retries=0) as net:
+        for i in range(5):
+            resp = net.get("https://example.com")
+            print(f"  请求 {i + 1}: {resp.status_code}")
+
+
+def rate_limit_per_domain_example():
+    """按域名独立限速。"""
+    # 不同域名使用不同的限速策略，互相独立
+    with SyncNet(
+        rate_limit=RateLimitConfig(
+            rate=10,  # 全局默认：10 次/秒
+            per_domain={
+                "example.com": 2,  # example.com：2 次/秒
+                "httpbin.org": RateLimitConfig(rate=1, duration=2000),  # httpbin：2 秒 1 次
+            },
+        ),
+        verify=False,
+        retries=0,
+    ) as net:
+        # 走域名限速（2 次/秒）
+        for i in range(3):
+            resp = net.get("https://example.com")
+            print(f"  example.com 请求 {i + 1}: {resp.status_code}")
+
+
+async def rate_limit_async_example():
+    """异步速率限制 + 并发控制组合。"""
+    # rate_limit 控制"每秒发多少个"，concurrency 控制"同时在跑多少个"
+    async with Net(
+        rate_limit=5,  # 每秒最多 5 个请求
+        concurrency=3,  # 同时最多 3 个在跑
+        verify=False,
+        retries=0,
+    ) as net:
+        urls = [f"https://example.com/?page={i}" for i in range(10)]
+        tasks = [net.get(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        print(f"  完成 {len(results)} 个请求，全部成功: {all(r.ok for r in results)}")
+
+
 # ==================== 会话 Cookie 管理 ====================
 
 
@@ -196,6 +244,15 @@ if __name__ == "__main__":
 
     print("\n=== 异步并发控制 ===")
     asyncio.run(concurrency_example())
+
+    print("\n=== 速率限制（基础） ===")
+    rate_limit_basic_example()
+
+    print("\n=== 速率限制（按域名） ===")
+    rate_limit_per_domain_example()
+
+    print("\n=== 速率限制（异步 + 并发控制） ===")
+    asyncio.run(rate_limit_async_example())
 
     print("\n=== Cookie 管理 ===")
     cookie_example()
