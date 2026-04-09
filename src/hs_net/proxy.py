@@ -2,7 +2,7 @@
 
 支持固定代理、列表轮换、自定义代理源三种模式。
 
-用法::
+用法:
 
     # 固定代理（隐式）
     net = Net(proxy="socks5://user:pass@host:port")
@@ -211,6 +211,7 @@ async def _connect_via_socks5(
     if username and password:
         auth_methods.append(SOCKS5AuthMethod.USERNAME_PASSWORD)
 
+    # noinspection PyCallingNonCallable
     conn.send(SOCKS5AuthMethodsRequest(auth_methods))
     writer.write(conn.data_to_send())
     await writer.drain()
@@ -220,6 +221,7 @@ async def _connect_via_socks5(
 
     # 用户名密码认证
     if auth_reply.method == SOCKS5AuthMethod.USERNAME_PASSWORD:
+        # noinspection PyCallingNonCallable
         conn.send(SOCKS5UsernamePasswordRequest(username.encode(), password.encode()))
         writer.write(conn.data_to_send())
         await writer.drain()
@@ -227,6 +229,7 @@ async def _connect_via_socks5(
         conn.receive_data(data)
 
     # 发送 CONNECT 命令（使用域名类型）
+    # noinspection PyCallingNonCallable
     conn.send(
         SOCKS5CommandRequest(
             SOCKS5Command.CONNECT,
@@ -262,13 +265,14 @@ async def _connect_via_socks4(
     from socksio import SOCKS4Command, SOCKS4Connection, SOCKS4Request
 
     reader, writer = await _open_connection(proxy_host, proxy_port, transit_info)
-    conn = SOCKS4Connection()
+    conn = SOCKS4Connection(user_id=(username or "").encode())
 
+    # noinspection PyCallingNonCallable
     conn.send(
-        SOCKS4Request(
-            SOCKS4Command.CONNECT,
-            target_port,
-            target_host.encode(),
+        SOCKS4Request(  # noqa
+            command=SOCKS4Command.CONNECT,
+            port=target_port,
+            addr=target_host.encode(),
             user_id=(username or "").encode(),
         )
     )
@@ -678,6 +682,7 @@ class ProxyService:
         if self._loop and self._server:
             future = asyncio.run_coroutine_threadsafe(self._server.stop(), self._loop)
             future.result(timeout=5)
+            # noinspection PyTypeChecker
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread:
             self._thread.join(timeout=5)
