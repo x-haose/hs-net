@@ -31,6 +31,12 @@ features:
   - title: 信号中间件
     details: 请求前、响应后、重试时三个钩子，实现日志、缓存、监控等横切关注点
     icon: 📡
+  - title: 代理归一化
+    details: 内置 ProxyService 统一处理 HTTP/SOCKS/认证代理，支持列表轮换、自定义代理源、代理链
+    icon: 🌐
+  - title: 速率限制
+    details: 基于令牌桶的限流，支持全局和按域名独立限速，防止触发 API 限流或被封禁
+    icon: ⏱️
   - title: 反爬支持
     details: curl-cffi 引擎支持浏览器 TLS 指纹模拟，配合随机 User-Agent，轻松应对反爬
     icon: 🛡️

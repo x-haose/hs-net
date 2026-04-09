@@ -96,11 +96,11 @@ resp.jmespath("data[*].[name, age]")       # 多字段
 def to_url(urls: list[str] | str) -> list[str]
 ```
 
-将相对路径转为绝对路径。已是 `http` 开头的会被过滤。
+将相对路径转为绝对路径。已是 `http://` 或 `https://` 开头的保持原样。
 
 ```python
 resp.to_url("/page")                       # => ["https://example.com/page"]
-resp.to_url(["/a", "https://other.com"])   # => ["https://example.com/a"]
+resp.to_url(["/a", "https://other.com"])   # => ["https://example.com/a", "https://other.com"]
 ```
 
 ## SelectorList 方法

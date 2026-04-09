@@ -21,10 +21,11 @@ SyncNet(
     retries: int = None,
     retry_delay: float = None,
     user_agent: str = None,
-    proxy: str = None,
+    proxy: str | ProxyService = None,
     verify: bool = None,
     raise_status: bool = None,
     allow_redirects: bool = None,
+    rate_limit: int | float | RateLimitConfig = None,
     concurrency: int = None,
     headers: dict[str, Any] = None,
     cookies: dict[str, Any] = None,
@@ -65,6 +66,26 @@ with SyncNet() as net:
             for chunk in resp:
                 f.write(chunk)
 ```
+
+## 属性
+
+### cookies
+
+```python
+@property
+def cookies(self) -> dict[str, str]
+```
+
+获取当前会话的 cookies。
+
+### proxy_service
+
+```python
+@property
+def proxy_service(self) -> ProxyService | None
+```
+
+获取代理服务实例，可用于调用 `switch()` 切换代理。
 
 ## 可用引擎
 

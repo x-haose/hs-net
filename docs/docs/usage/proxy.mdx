@@ -1,0 +1,190 @@
+# 代理
+
+hs-net 内置代理归一化服务（`ProxyService`），统一处理 HTTP/SOCKS/认证代理，对外暴露纯 HTTP 本地代理。
+
+## 简单代理
+
+直接传字符串，支持 HTTP、HTTPS、SOCKS4、SOCKS5 及认证格式：
+
+```python title="simple_proxy.py"
+from hs_net import SyncNet
+
+# HTTP 代理
+with SyncNet(proxy="http://proxy-host:8080") as net:
+    resp = net.get("https://example.com")
+
+# HTTPS 代理
+with SyncNet(proxy="https://proxy-host:8443") as net:
+    resp = net.get("https://example.com")
+
+# SOCKS5 代理
+with SyncNet(proxy="socks5://proxy-host:1080") as net:
+    resp = net.get("https://example.com")
+
+# SOCKS4 代理
+with SyncNet(proxy="socks4://proxy-host:1080") as net:
+    resp = net.get("https://example.com")
+
+# 带认证的代理
+with SyncNet(proxy="http://user:password@proxy-host:8080") as net:
+    resp = net.get("https://example.com")
+
+# 带认证的 SOCKS5
+with SyncNet(proxy="socks5://user:password@proxy-host:1080") as net:
+    resp = net.get("https://example.com")
+```
+
+:::tip 支持的代理格式
+| 格式 | 示例 |
+|------|------|
+| HTTP | `http://host:port` |
+| HTTPS | `https://host:port` |
+| SOCKS4 | `socks4://host:port` |
+| SOCKS4a | `socks4a://host:port` |
+| SOCKS5 | `socks5://host:port` |
+| SOCKS5h | `socks5h://host:port` |
+| 带认证 | `http://user:pass@host:port` |
+| 带认证 SOCKS5 | `socks5://user:pass@host:port` |
+:::
+
+## 代理认证
+
+代理认证通过 URL 中的 `user:password@` 部分传递，不同协议的认证方式由 hs-net 自动处理：
+
+### HTTP/HTTPS 代理认证
+
+使用 HTTP Basic Auth，hs-net 自动编码为 `Proxy-Authorization` 头：
+
+```python title="http_auth.py"
+# 用户名 + 密码
+with SyncNet(proxy="http://admin:secret123@proxy-host:8080") as net:
+    resp = net.get("https://example.com")
+
+# HTTPS 代理同理
+with SyncNet(proxy="https://admin:secret123@proxy-host:8443") as net:
+    resp = net.get("https://example.com")
+```
+
+### SOCKS5 代理认证
+
+SOCKS5 支持用户名/密码认证（RFC 1929），hs-net 自动完成认证握手：
+
+```python title="socks5_auth.py"
+with SyncNet(proxy="socks5://myuser:mypass@proxy-host:1080") as net:
+    resp = net.get("https://example.com")
+```
+
+### SOCKS4 代理认证
+
+SOCKS4 仅支持 `user_id`（无密码），通过用户名字段传递：
+
+```python title="socks4_auth.py"
+with SyncNet(proxy="socks4://myuser@proxy-host:1080") as net:
+    resp = net.get("https://example.com")
+```
+
+### 认证格式汇总
+
+| 协议 | 认证方式 | URL 格式 |
+|------|----------|----------|
+| HTTP/HTTPS | Basic Auth（自动 Base64 编码） | `http://user:pass@host:port` |
+| SOCKS5 | 用户名/密码认证（RFC 1929） | `socks5://user:pass@host:port` |
+| SOCKS4 | User ID（仅用户名） | `socks4://user@host:port` |
+
+:::warning 特殊字符
+密码中包含 `@`、`:`、`/` 等特殊字符时，需要进行 URL 编码：
+
+```python
+from urllib.parse import quote
+
+password = quote("p@ss:word/123", safe="")
+proxy = f"http://user:{password}@proxy-host:8080"
+# => http://user:p%40ss%3Aword%2F123@proxy-host:8080
+```
+:::
+
+## ProxyService
+
+对于更复杂的代理需求，使用 `ProxyService`：
+
+### 列表轮换
+
+```python title="list_proxy.py"
+from hs_net import Net, ProxyService
+
+# 轮询模式（默认）
+proxy = ProxyService([
+    "http://proxy1:8080",
+    "socks5://proxy2:1080",
+    "http://user:pass@proxy3:8080",
+], strategy="round_robin")
+
+async with Net(proxy=proxy) as net:
+    # 每次 switch() 切换到下一个代理
+    resp = await net.get("https://example.com")
+    net.proxy_service.switch()  # 切换到下一个
+    resp = await net.get("https://example.com")
+```
+
+```python title="random_proxy.py"
+# 随机模式
+proxy = ProxyService([
+    "http://proxy1:8080",
+    "socks5://proxy2:1080",
+], strategy="random")
+
+with SyncNet(proxy=proxy) as net:
+    resp = net.get("https://example.com")
+    net.proxy_service.switch()  # 随机切换
+```
+
+### 自定义代理源
+
+实现 `ProxyProvider` 接口，对接自己的代理 API：
+
+```python title="custom_provider.py"
+from hs_net import Net, ProxyService, ProxyProvider
+
+class MyProvider(ProxyProvider):
+    """从代理 API 获取代理地址。"""
+
+    def get_proxy(self) -> str:
+        # 这里可以调用你的代理 API
+        return "socks5://1.2.3.4:1080"
+
+proxy = ProxyService(provider=MyProvider())
+
+async with Net(proxy=proxy) as net:
+    resp = await net.get("https://example.com")
+    net.proxy_service.switch()  # 调用 provider.get_proxy() 获取新代理
+```
+
+### 代理链（中转代理）
+
+通过中转代理访问上游代理，适用于上游代理无法直连的场景（如通过本地 Clash 中转访问海外代理）：
+
+```python title="transit_proxy.py"
+from hs_net import Net, ProxyService
+
+# 通过本地 Clash (127.0.0.1:7897) 中转访问海外 SOCKS5 代理
+proxy = ProxyService(
+    "socks5://overseas-proxy:1080",
+    transit="http://127.0.0.1:7897",
+)
+
+async with Net(proxy=proxy) as net:
+    resp = await net.get("https://example.com")
+```
+
+流量路径：`客户端 → 本地 Clash → 海外代理 → 目标网站`
+
+## 代理工作原理
+
+当使用 `ProxyService` 时，hs-net 会在本地启动一个 HTTP 代理服务器（`127.0.0.1` 随机端口），自动处理：
+
+1. **协议转换**：将 SOCKS4/SOCKS5 代理统一为 HTTP 代理
+2. **认证处理**：自动注入代理认证头
+3. **代理链**：支持通过中转代理连接上游
+4. **热切换**：调用 `switch()` 即可切换上游代理，无需重建连接
+
+所有引擎只需连接本地 HTTP 代理，无需各自处理 SOCKS 协议和认证。

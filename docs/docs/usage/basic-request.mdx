@@ -84,9 +84,6 @@ with SyncNet() as net:
     # 自定义超时
     resp = net.get("https://example.com", timeout=5.0)
 
-    # 指定代理
-    resp = net.get("https://example.com", proxy="http://proxy:8080")
-
     # 自定义 User-Agent
     resp = net.get("https://example.com", user_agent="MyBot/1.0")
 ```

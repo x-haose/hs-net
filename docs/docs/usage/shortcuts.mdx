@@ -75,12 +75,6 @@ resp = await hs_net.get(
     retries=5,
     retry_delay=1.0,
 )
-
-# 代理
-resp = await hs_net.get(
-    "https://example.com",
-    proxy="http://127.0.0.1:7890",
-)
 ```
 
 ## 可用函数

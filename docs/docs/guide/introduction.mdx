@@ -54,6 +54,21 @@ async def log_request(req_data):
     print(f"发送: {req_data.method} {req_data.url}")
 ```
 
+### 代理归一化 & 速率限制
+
+```python title="proxy_and_rate_limit.py"
+from hs_net import Net, ProxyService
+
+# 代理归一化：统一处理 HTTP/SOCKS/认证代理
+net = Net(proxy="socks5://user:pass@host:1080")
+
+# 代理列表轮换
+net = Net(proxy=ProxyService(["http://p1:port", "socks5://p2:port"]))
+
+# 速率限制：每秒最多 5 个请求
+net = Net(rate_limit=5)
+```
+
 ## 设计理念
 
 - **统一**：不管用哪个引擎，API 完全一致

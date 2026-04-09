@@ -72,11 +72,16 @@ with SyncNet(cookies={"init_token": "abc"}) as net:
 
 ## SSL 证书
 
-```python title="ssl.py"
-# 跳过 SSL 验证（开发环境）
-net = SyncNet(verify=False)
+hs-net 默认关闭 SSL 证书验证（`verify=False`），方便开发和爬虫场景：
 
-# 单次请求跳过
+```python title="ssl.py"
+# 默认不验证 SSL（无需额外配置）
+net = SyncNet()
+
+# 开启 SSL 验证（生产环境推荐）
+net = SyncNet(verify=True)
+
+# 单次请求覆盖
 resp = net.get("https://self-signed.example.com", verify=False)
 ```
 
