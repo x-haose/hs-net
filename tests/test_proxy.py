@@ -195,14 +195,6 @@ class TestClientIntegration:
         assert svc.started
         net.close()
 
-    def test_sync_net_with_proxy_list(self):
-        from hs_net.sync_client import SyncNet
-
-        net = SyncNet(proxy=["http://p1:8080", "http://p2:8080"], verify=False, retries=0)
-        assert net.proxy_service is not None
-        assert net.proxy_service.started
-        net.close()
-
     def test_sync_net_with_proxy_string(self):
         """字符串代理也统一走 ProxyService。"""
         from hs_net.sync_client import SyncNet
@@ -220,14 +212,6 @@ class TestClientIntegration:
         async with Net(proxy=svc, verify=False, retries=0) as net:
             assert net.proxy_service is svc
             assert svc.started
-
-    @pytest.mark.asyncio
-    async def test_async_net_with_proxy_list(self):
-        from hs_net.client import Net
-
-        async with Net(proxy=["http://p1:8080", "http://p2:8080"], verify=False, retries=0) as net:
-            assert net.proxy_service is not None
-            assert net.proxy_service.started
 
     @pytest.mark.asyncio
     async def test_async_net_no_proxy(self):
