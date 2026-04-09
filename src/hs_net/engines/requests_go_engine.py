@@ -89,10 +89,10 @@ class RequestsGoEngine(EngineBase):
                 content=response.content,
                 request_data=request_data,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     async def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 requests-go 执行异步流式 HTTP 请求。
@@ -127,10 +127,10 @@ class RequestsGoEngine(EngineBase):
                 stream=response.iter_content(chunk_size=8192),
                 close_callback=response.close,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
 
 class SyncRequestsGoEngine(SyncEngineBase):
@@ -201,10 +201,10 @@ class SyncRequestsGoEngine(SyncEngineBase):
                 content=response.content,
                 request_data=request_data,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 requests-go 执行同步流式 HTTP 请求。
@@ -239,7 +239,7 @@ class SyncRequestsGoEngine(SyncEngineBase):
                 stream=response.iter_content(chunk_size=8192),
                 close_callback=response.close,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None

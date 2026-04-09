@@ -105,10 +105,10 @@ class AiohttpEngine(EngineBase):
                 content=resp_content,
                 request_data=request_data,
             )
-        except TimeoutError as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except TimeoutError:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except aiohttp.ClientConnectorError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     async def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 aiohttp 执行异步流式 HTTP 请求。
@@ -153,7 +153,7 @@ class AiohttpEngine(EngineBase):
                 stream=response.content.iter_any(),
                 close_callback=response.release,
             )
-        except TimeoutError as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except TimeoutError:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except aiohttp.ClientConnectorError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None

@@ -95,10 +95,10 @@ class HttpxEngine(EngineBase):
                 content=response.content,
                 request_data=request_data,
             )
-        except httpx.TimeoutException as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.TimeoutException:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except httpx.ConnectError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     async def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 httpx 执行异步流式 HTTP 请求。
@@ -146,10 +146,10 @@ class HttpxEngine(EngineBase):
                 stream=response.aiter_bytes(),
                 close_callback=response.aclose,
             )
-        except httpx.TimeoutException as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.TimeoutException:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except httpx.ConnectError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
 
 class SyncHttpxEngine(SyncEngineBase):
@@ -232,10 +232,10 @@ class SyncHttpxEngine(SyncEngineBase):
                 content=response.content,
                 request_data=request_data,
             )
-        except httpx.TimeoutException as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.TimeoutException:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except httpx.ConnectError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 httpx 执行同步流式 HTTP 请求。
@@ -283,7 +283,7 @@ class SyncHttpxEngine(SyncEngineBase):
                 stream=response.iter_bytes(),
                 close_callback=response.close,
             )
-        except httpx.TimeoutException as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except httpx.TimeoutException:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except httpx.ConnectError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
