@@ -281,8 +281,7 @@ class Net:
                 return result
 
         logger.debug(
-            f"[{data.method}] {data.url} proxy={data.proxy} "
-            f"params={data.url_params} json={data.json_data} form={data.form_data}"
+            f"[{data.method}] {data.url} " f"params={data.url_params} json={data.json_data} form={data.form_data}"
         )
 
         resp = await self._engine.download(data)
@@ -307,7 +306,6 @@ class Net:
         headers: dict = None,
         cookies: dict = None,
         timeout: float = None,
-        proxy: str = None,
         verify: bool = None,
         retries: int = None,
         retry_delay: float = None,
@@ -329,7 +327,6 @@ class Net:
             headers: 请求头。
             cookies: cookies。
             timeout: 超时时间（秒）。
-            proxy: 代理地址。
             verify: 是否验证 SSL 证书。
             retries: 重试次数。
             retry_delay: 重试间隔（秒）。
@@ -355,7 +352,6 @@ class Net:
             headers=headers,
             cookies=cookies,
             timeout=timeout,
-            proxy=proxy,
             verify=verify,
             retries=retries,
             retry_delay=retry_delay,
@@ -391,7 +387,6 @@ class Net:
         headers: dict = None,
         cookies: dict = None,
         timeout: float = None,
-        proxy: str = None,
         verify: bool = None,
         raise_status: bool = None,
         allow_redirects: bool = None,
@@ -417,7 +412,6 @@ class Net:
             headers: 请求头。
             cookies: cookies。
             timeout: 超时时间（秒）。
-            proxy: 代理地址。
             verify: 是否验证 SSL 证书。
             raise_status: 是否抛出状态码异常。
             allow_redirects: 是否允许重定向。
@@ -437,7 +431,6 @@ class Net:
             headers=headers,
             cookies=cookies,
             timeout=timeout,
-            proxy=proxy,
             verify=verify,
             raise_status=raise_status,
             allow_redirects=allow_redirects,

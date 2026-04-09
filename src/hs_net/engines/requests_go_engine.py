@@ -50,6 +50,9 @@ class RequestsGoEngine(EngineBase):
         self.client.verify = self._verify
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
+        proxy = engine_options.get("proxy")
+        if proxy:
+            self.client.proxies = {"http": proxy, "https": proxy}
 
     async def close(self):
         """关闭 requests-go 客户端。"""
@@ -162,6 +165,9 @@ class SyncRequestsGoEngine(SyncEngineBase):
         self.client.verify = self._verify
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
+        proxy = engine_options.get("proxy")
+        if proxy:
+            self.client.proxies = {"http": proxy, "https": proxy}
 
     def close(self):
         """关闭 requests-go 客户端。"""

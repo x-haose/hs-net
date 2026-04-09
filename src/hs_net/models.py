@@ -57,6 +57,5 @@ class RequestModel:
     headers: dict[str, Any] | None = field(default_factory=dict)
     cookies: dict[str, Any] | None = field(default_factory=dict)
     timeout: float | None = None
-    proxy: str | None = None
     retries: int | None = None
     retry_delay: float | None = None

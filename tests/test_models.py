@@ -41,7 +41,6 @@ class TestRequestModel:
         assert req.form_data is None
         assert req.files is None
         assert req.timeout is None
-        assert req.proxy is None
         assert req.retries is None
         assert req.retry_delay is None
 

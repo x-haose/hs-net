@@ -46,12 +46,14 @@ class CurlCffiEngine(EngineBase):
 
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        proxy = engine_options.get("proxy")
         self.client = AsyncSession(
             verify=self._verify,
             headers=self._default_headers,
             cookies=self._default_cookies,
             impersonate=engine_options.get("impersonate", "chrome110"),
             http_version=engine_options.get("http_version", CurlHttpVersion.V2_0),
+            proxy=proxy,
         )
 
     async def close(self):
@@ -162,12 +164,14 @@ class SyncCurlCffiEngine(SyncEngineBase):
 
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        proxy = engine_options.get("proxy")
         self.client = Session(
             verify=self._verify,
             headers=self._default_headers,
             cookies=self._default_cookies,
             impersonate=engine_options.get("impersonate", "chrome110"),
             http_version=engine_options.get("http_version", CurlHttpVersion.V2_0),
+            proxy=proxy,
         )
 
     def close(self):

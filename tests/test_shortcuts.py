@@ -47,7 +47,6 @@ _DEFAULTS = {
     "headers": None,
     "cookies": None,
     "timeout": None,
-    "proxy": None,
     "verify": None,
     "retries": None,
     "retry_delay": None,

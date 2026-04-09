@@ -63,5 +63,5 @@ def format_retry_log(req_data, retry_state: RetryCallState) -> tuple[str, int, E
     if isinstance(exception, StatusException):
         exc_msg = f"HTTP {exception.code}"
 
-    log_msg = f"[{req_data.method}] {req_data.url} proxy={req_data.proxy} error=[{exc_type}]: {exc_msg}"
+    log_msg = f"[{req_data.method}] {req_data.url} error=[{exc_type}]: {exc_msg}"
     return log_msg, attempt, exception

@@ -106,16 +106,6 @@ class TestBuildRequest:
         req = build_request(cfg, url="https://x.com", method="GET", verify=False)
         assert req.verify is False
 
-    def test_proxy_from_config(self):
-        cfg = NetConfig(proxy="http://proxy:8080")
-        req = build_request(cfg, url="https://x.com", method="GET")
-        assert req.proxy == "http://proxy:8080"
-
-    def test_proxy_override(self):
-        cfg = NetConfig(proxy="http://old:8080")
-        req = build_request(cfg, url="https://x.com", method="GET", proxy="http://new:9090")
-        assert req.proxy == "http://new:9090"
-
     def test_all_none_params_use_config(self):
         """所有参数为 None 时全部从 config 取值。"""
         cfg = NetConfig(

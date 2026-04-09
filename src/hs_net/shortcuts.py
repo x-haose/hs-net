@@ -63,7 +63,6 @@ async def request(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -87,7 +86,7 @@ async def request(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -115,7 +114,6 @@ async def request(
             headers=headers,
             cookies=cookies,
             timeout=timeout,
-            proxy=proxy,
             verify=verify,
             retries=retries,
             retry_delay=retry_delay,
@@ -134,7 +132,6 @@ async def get(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -151,7 +148,7 @@ async def get(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -175,7 +172,6 @@ async def get(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -196,7 +192,6 @@ async def post(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -216,7 +211,7 @@ async def post(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -242,7 +237,6 @@ async def post(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -263,7 +257,6 @@ async def put(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -283,7 +276,7 @@ async def put(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -309,7 +302,6 @@ async def put(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -330,7 +322,6 @@ async def patch(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -350,7 +341,7 @@ async def patch(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -376,7 +367,6 @@ async def patch(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -394,7 +384,6 @@ async def delete(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -411,7 +400,7 @@ async def delete(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -434,7 +423,6 @@ async def delete(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -452,7 +440,6 @@ async def head(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -469,7 +456,7 @@ async def head(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -493,7 +480,6 @@ async def head(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -511,7 +497,6 @@ async def options(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -528,7 +513,7 @@ async def options(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -551,7 +536,6 @@ async def options(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -579,7 +563,6 @@ def sync_request(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -603,7 +586,7 @@ def sync_request(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -631,7 +614,6 @@ def sync_request(
             headers=headers,
             cookies=cookies,
             timeout=timeout,
-            proxy=proxy,
             verify=verify,
             retries=retries,
             retry_delay=retry_delay,
@@ -650,7 +632,6 @@ def sync_get(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -667,7 +648,7 @@ def sync_get(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -691,7 +672,6 @@ def sync_get(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -712,7 +692,6 @@ def sync_post(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -732,7 +711,7 @@ def sync_post(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -758,7 +737,6 @@ def sync_post(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -779,7 +757,6 @@ def sync_put(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -799,7 +776,7 @@ def sync_put(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -825,7 +802,6 @@ def sync_put(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -846,7 +822,6 @@ def sync_patch(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -866,7 +841,7 @@ def sync_patch(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -892,7 +867,6 @@ def sync_patch(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -910,7 +884,6 @@ def sync_delete(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -927,7 +900,7 @@ def sync_delete(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -950,7 +923,6 @@ def sync_delete(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -968,7 +940,6 @@ def sync_head(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -985,7 +956,7 @@ def sync_head(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -1009,7 +980,6 @@ def sync_head(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,
@@ -1027,7 +997,6 @@ def sync_options(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -1044,7 +1013,7 @@ def sync_options(
         headers: 请求头。
         cookies: cookies。
         timeout: 超时时间（秒）。
-        proxy: 代理地址。
+
         verify: 是否验证 SSL 证书。
         retries: 重试次数。
         retry_delay: 重试间隔（秒）。
@@ -1067,7 +1036,6 @@ def sync_options(
         headers=headers,
         cookies=cookies,
         timeout=timeout,
-        proxy=proxy,
         verify=verify,
         retries=retries,
         retry_delay=retry_delay,

@@ -44,6 +44,7 @@ class AiohttpEngine(EngineBase):
 
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        self._proxy = engine_options.get("proxy")
         self.client = ClientSession(
             headers=self._default_headers,
             cookies=self._default_cookies,
@@ -88,7 +89,7 @@ class AiohttpEngine(EngineBase):
                 json=request_data.json_data,
                 cookies=request_data.cookies,
                 headers=request_data.headers,
-                proxy=request_data.proxy,
+                proxy=self._proxy,
                 timeout=timeout,
                 allow_redirects=request_data.allow_redirects,
             )
@@ -134,7 +135,7 @@ class AiohttpEngine(EngineBase):
                 json=request_data.json_data,
                 cookies=request_data.cookies,
                 headers=request_data.headers,
-                proxy=request_data.proxy,
+                proxy=self._proxy,
                 timeout=timeout,
                 allow_redirects=request_data.allow_redirects,
             )

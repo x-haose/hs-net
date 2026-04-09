@@ -2,9 +2,10 @@
 自定义代理源
 
 实现 ProxyProvider 对接任意代理源（API、Redis、文件等）。
+所有引擎均可搭配使用。
 """
 
-from hs_net import ProxyProvider, ProxyService, SyncNet
+from hs_net import EngineEnum, ProxyProvider, ProxyService, SyncNet
 
 # 替换为你自己的代理地址
 PROXY_LIST = [
@@ -12,6 +13,14 @@ PROXY_LIST = [
     "socks5://user:pass@proxy2:1080",
 ]
 TEST_URL = "http://ip-api.com/json/"
+
+# 所有支持同步的引擎
+SYNC_ENGINES = [
+    EngineEnum.HTTPX,
+    EngineEnum.REQUESTS,
+    EngineEnum.CURL_CFFI,
+    EngineEnum.REQUESTS_GO,
+]
 
 
 class MyProvider(ProxyProvider):
@@ -30,9 +39,11 @@ class MyProvider(ProxyProvider):
 def main():
     svc = ProxyService(provider=MyProvider())
 
-    with SyncNet(proxy=svc, retries=0, timeout=30) as net:
-        resp = net.get(TEST_URL)
-        print(f"IP: {resp.json_data['query']}")
+    for engine in SYNC_ENGINES:
+        with SyncNet(proxy=svc, engine=engine, retries=0, timeout=30) as net:
+            resp = net.get(TEST_URL)
+            ip = resp.json_data["query"]
+            print(f"{engine.value:12s} -> IP: {ip}")
 
 
 if __name__ == "__main__":
