@@ -1,5 +1,5 @@
 """
-示例 2: 各种 HTTP 方法
+各种 HTTP 方法
 
 演示 GET、POST（JSON / 表单 / 文件上传）、PUT、PATCH、DELETE 等请求方式。
 """
@@ -12,7 +12,6 @@ from hs_net import Net
 async def main():
     async with Net(
         base_url="https://httpbin.org",
-        verify=False,
         retries=0,
         user_agent="MyApp/1.0",
     ) as net:

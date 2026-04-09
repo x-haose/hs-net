@@ -1,0 +1,63 @@
+"""
+响应后中间件 (on_response_after)
+
+在收到响应后执行，可用于计时、统计、日志记录等。
+"""
+
+import asyncio
+import time
+
+from hs_net import Net, SyncNet
+
+# ==================== 同步：请求计时 ====================
+
+
+def timing_example():
+    """记录每个请求的耗时。"""
+    with SyncNet(retries=0) as net:
+        timings = {}
+
+        @net.on_request_before
+        def start_timer(req_data):
+            timings["start"] = time.time()
+            print(f"  -> 发送请求: {req_data.method} {req_data.url}")
+
+        @net.on_response_after
+        def log_timing(resp):
+            elapsed = time.time() - timings["start"]
+            print(f"  <- 收到响应: {resp.status_code} ({elapsed:.3f}s)")
+
+        net.get("https://example.com")
+
+
+# ==================== 异步：请求统计 ====================
+
+
+async def stats_example():
+    """统计请求的成功/失败数量。"""
+    async with Net(retries=0) as net:
+        stats = {"total": 0, "success": 0, "fail": 0}
+
+        @net.on_request_before
+        async def count_request(req_data):
+            stats["total"] += 1
+
+        @net.on_response_after
+        async def count_result(resp):
+            if resp.ok:
+                stats["success"] += 1
+            else:
+                stats["fail"] += 1
+
+        await net.get("https://example.com")
+        await net.get("https://example.com")
+
+        print(f"  统计: 总计={stats['total']}, 成功={stats['success']}, 失败={stats['fail']}")
+
+
+if __name__ == "__main__":
+    print("=== 同步：请求计时 ===")
+    timing_example()
+
+    print("\n=== 异步：请求统计 ===")
+    asyncio.run(stats_example())

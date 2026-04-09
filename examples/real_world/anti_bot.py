@@ -1,0 +1,25 @@
+"""
+反爬场景
+
+使用 curl_cffi 引擎模拟浏览器指纹，绕过 TLS 指纹检测。
+
+注意: 需要安装 curl-cffi 引擎: pip install hs-net[curl]
+"""
+
+from hs_net import EngineEnum, SyncNet
+
+
+def main():
+    with SyncNet(
+        engine=EngineEnum.CURL_CFFI,
+        retries=0,
+        user_agent="chrome",
+        engine_options={"impersonate": "chrome120"},
+    ) as net:
+        resp = net.get("https://example.com")
+        print(f"curl_cffi 反爬: {resp.status_code}")
+        print(f"标题: {resp.css('title::text').get()}")
+
+
+if __name__ == "__main__":
+    main()

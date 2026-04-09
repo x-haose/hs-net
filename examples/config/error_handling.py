@@ -1,0 +1,73 @@
+"""
+异常处理
+
+hs-net 定义了 7 种异常类型，覆盖各种网络错误场景。
+"""
+
+from hs_net import (
+    ConnectionException,
+    EngineEnum,
+    EngineNotInstalled,
+    RequestException,
+    RetryExhausted,
+    StatusException,
+    SyncNet,
+    TimeoutException,
+)
+
+
+def main():
+    # ---------- 1. 状态码异常 ----------
+    with SyncNet(retries=0, raise_status=True) as net:
+        try:
+            net.get("https://example.com/nonexistent-page-12345")
+        except StatusException as e:
+            print(f"状态码异常: HTTP {e.code}, URL: {e.url}")
+
+    # ---------- 2. 超时异常 ----------
+    with SyncNet(retries=0) as net:
+        try:
+            net.get("https://httpbin.org/delay/10", timeout=0.5)
+        except TimeoutException as e:
+            print(f"超时异常: timeout={e.timeout}s, URL: {e.url}")
+
+    # ---------- 3. 连接异常 ----------
+    with SyncNet(retries=0) as net:
+        try:
+            net.get("https://this-domain-does-not-exist-12345.com")
+        except ConnectionException as e:
+            print(f"连接异常: {e.url}")
+
+    # ---------- 4. 重试耗尽异常 ----------
+    with SyncNet(retries=2, raise_status=True) as net:
+        try:
+            net.get("https://example.com/nonexistent-page-12345")
+        except RetryExhausted as e:
+            print(f"重试耗尽: {e.attempts} 次尝试, 最后异常: {type(e.last_exception).__name__}")
+
+    # ---------- 5. 引擎未安装异常 ----------
+    try:
+        with SyncNet(engine=EngineEnum.CURL_CFFI, retries=0) as net:
+            net.get("https://example.com")
+            print("curl_cffi 引擎已安装，正常运行")
+    except EngineNotInstalled as e:
+        print(f"引擎未安装: {e.engine_name}, 请运行: pip install {e.install_package}")
+
+    # ---------- 6. 统一捕获所有 hs-net 异常 ----------
+    with SyncNet(retries=0, raise_status=True) as net:
+        try:
+            net.get("https://example.com/nonexistent-page-12345")
+        except RequestException as e:
+            print(f"统一异常: [{e.exception_type}] {e.exception_msg}")
+
+    # ---------- 7. 关闭异常抛出，手动检查状态码 ----------
+    with SyncNet(retries=0, raise_status=False) as net:
+        resp = net.get("https://example.com/nonexistent-page-12345")
+        if not resp.ok:
+            print(f"请求失败: {resp.status_code}")
+        else:
+            print(f"请求成功: {resp.status_code}")
+
+
+if __name__ == "__main__":
+    main()

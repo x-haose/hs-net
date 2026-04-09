@@ -1,0 +1,62 @@
+"""
+CSS / XPath / 正则选择器
+
+从 HTML 页面中提取数据的三种方式。
+"""
+
+from hs_net import SyncNet
+
+
+def main():
+    with SyncNet(retries=0) as net:
+        resp = net.get("https://example.com")
+
+        # --- CSS 选择器 ---
+        # 获取页面标题
+        title = resp.css("title::text").get()
+        print(f"CSS 标题: {title}")
+        # => Example Domain
+
+        # 获取所有链接
+        links = resp.css("a::attr(href)").getall()
+        print(f"CSS 链接: {links}")
+        # => ['https://www.iana.org/domains/example']
+
+        # 获取链接文字
+        link_text = resp.css("a::text").get()
+        print(f"CSS 链接文字: {link_text}")
+        # => More information...
+
+        # --- XPath ---
+        # 获取段落文本
+        paragraphs = resp.xpath("//p/text()").getall()
+        print(f"XPath 段落: {paragraphs}")
+
+        # 带条件的 XPath
+        link = resp.xpath("//a/@href").get()
+        print(f"XPath 链接: {link}")
+
+        # --- 正则 ---
+        # 从文本中提取信息
+        domain = resp.re_first(r"domain in the (\w+)")
+        print(f"正则提取: {domain}")
+
+        # 提取所有匹配
+        words = resp.re(r"\b[A-Z][a-z]{5,}\b")
+        print(f"正则所有匹配: {words}")
+
+        # --- to_url: 相对路径转绝对路径 ---
+        hrefs = resp.css("a::attr(href)").getall()
+        absolute_urls = resp.to_url(hrefs)
+        print(f"to_url 转换: {hrefs} -> {absolute_urls}")
+
+        # 混合相对和绝对 URL，绝对 URL 原样保留
+        mixed = ["/relative/path", "https://example.com/absolute"]
+        print(f"to_url 混合: {resp.to_url(mixed)}")
+
+        # 单个字符串也支持
+        print(f"to_url 单个: {resp.to_url('/page')}")
+
+
+if __name__ == "__main__":
+    main()

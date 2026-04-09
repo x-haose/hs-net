@@ -1,0 +1,52 @@
+"""
+带监控的批量请求
+
+批量请求 + 中间件监控，统计成功率和 QPS。
+"""
+
+import asyncio
+import time
+
+from hs_net import Net
+
+
+async def main():
+    stats = {"total": 0, "success": 0, "fail": 0, "total_time": 0.0}
+
+    async with Net(retries=0, concurrency=5) as net:
+
+        @net.on_request_before
+        async def track_start(req_data):
+            stats["total"] += 1
+
+        @net.on_response_after
+        async def track_result(resp):
+            if resp.ok:
+                stats["success"] += 1
+            else:
+                stats["fail"] += 1
+
+        # 批量请求
+        urls = [f"https://example.com/?id={i}" for i in range(20)]
+
+        start = time.time()
+        tasks = [net.get(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        stats["total_time"] = time.time() - start
+
+        # 输出统计
+        print("批量请求完成:")
+        print(f"  总计: {stats['total']}")
+        print(f"  成功: {stats['success']}")
+        print(f"  失败: {stats['fail']}")
+        print(f"  耗时: {stats['total_time']:.2f}s")
+        print(f"  QPS:  {stats['total'] / stats['total_time']:.1f}")
+
+        # 提取每个页面的标题
+        titles = [r.css("title::text").get() for r in results]
+        unique_titles = set(titles)
+        print(f"  页面标题: {unique_titles}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

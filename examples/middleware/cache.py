@@ -1,0 +1,41 @@
+"""
+响应缓存中间件
+
+利用 on_request_before 和 on_response_after 实现简单的内存缓存。
+相同 URL 的第二次请求直接返回缓存结果，不走网络。
+"""
+
+from hs_net import SyncNet
+
+
+def main():
+    with SyncNet(retries=0) as net:
+        cache = {}
+
+        @net.on_request_before
+        def check_cache(req_data):
+            """请求前检查缓存，命中则直接返回 Response。"""
+            if req_data.url in cache:
+                print(f"  缓存命中: {req_data.url}")
+                return cache[req_data.url]
+            print(f"  缓存未命中: {req_data.url}")
+
+        @net.on_response_after
+        def save_cache(resp):
+            """响应后存入缓存。"""
+            cache[resp.url] = resp
+
+        # 第一次请求 -- 走网络
+        resp1 = net.get("https://example.com")
+        print(f"  第一次: {resp1.status_code}")
+
+        # 第二次请求 -- 走缓存
+        resp2 = net.get("https://example.com")
+        print(f"  第二次: {resp2.status_code}")
+
+        # 验证是同一个对象
+        print(f"  是否同一对象: {resp1 is resp2}")
+
+
+if __name__ == "__main__":
+    main()
