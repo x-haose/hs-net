@@ -65,6 +65,10 @@ ignore = ["B008", "C901"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::PendingDeprecationWarning:jmespath",
+    "ignore::urllib3.exceptions.InsecureRequestWarning",
+]
 
 [tool.bandit]
 exclude_dirs = ["tests"]

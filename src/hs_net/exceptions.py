@@ -1,3 +1,29 @@
+import sys
+import traceback as _tb_module
+
+# 内部模块路径关键字，这些帧对用户没有调试价值
+_INTERNAL_PATHS = ("/hs_net/", "/asyncio/", "/tenacity/")
+
+_original_excepthook = sys.excepthook
+
+
+def _hs_net_excepthook(exc_type, exc_value, exc_tb):
+    """自定义异常钩子：对 hs-net 异常只展示用户代码帧，过滤内部堆栈。"""
+    if isinstance(exc_value, RequestException):
+        entries = _tb_module.extract_tb(exc_tb)
+        filtered = [e for e in entries if not any(p in e.filename for p in _INTERNAL_PATHS)]
+        sys.stderr.write("Traceback (most recent call last):\n")
+        for line in _tb_module.format_list(filtered):
+            sys.stderr.write(line)
+        for line in _tb_module.format_exception_only(exc_type, exc_value):
+            sys.stderr.write(line)
+    else:
+        _original_excepthook(exc_type, exc_value, exc_tb)
+
+
+sys.excepthook = _hs_net_excepthook
+
+
 class RequestException(Exception):
     """请求异常基类，所有 hs-net 异常的父类。
 

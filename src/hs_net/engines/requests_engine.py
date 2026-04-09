@@ -47,6 +47,11 @@ class SyncRequestsEngine(SyncEngineBase):
 
         self.client = Session()
         self.client.verify = self._verify
+
+        if not self._verify:
+            import urllib3
+
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
 

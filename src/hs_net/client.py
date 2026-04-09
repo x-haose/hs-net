@@ -12,7 +12,7 @@ from hs_net._shared import format_retry_log, merge_config
 from hs_net.config import NetConfig
 from hs_net.engines.base import EngineBase
 from hs_net.engines.httpx_engine import HttpxEngine
-from hs_net.exceptions import RetryExhausted
+from hs_net.exceptions import RequestException, RetryExhausted
 from hs_net.models import EngineEnum, RequestModel
 from hs_net.proxy import ProxyService
 from hs_net.rate_limit import RateLimitConfig, RateLimitManager
@@ -108,7 +108,7 @@ class Net:
         retries: int = None,
         retry_delay: float = None,
         user_agent: str = None,
-        proxy: str | list[str] | ProxyService = None,
+        proxy: str | ProxyService = None,
         verify: bool = None,
         raise_status: bool = None,
         allow_redirects: bool = None,
@@ -147,7 +147,7 @@ class Net:
         proxy = proxy if proxy is not None else (config.proxy if config else None)
         if isinstance(proxy, ProxyService):
             self._proxy_service = proxy
-        elif isinstance(proxy, str | list):
+        elif isinstance(proxy, str):
             self._proxy_service = ProxyService(proxy)
         proxy = None  # 代理由 __aenter__ 启动 ProxyService 后注入
 
@@ -363,17 +363,20 @@ class Net:
             allow_redirects=allow_redirects,
         )
 
-        if not data.retries or data.retries < 1:
-            return await self._do_request(data)
+        try:
+            if not data.retries or data.retries < 1:
+                return await self._do_request(data)
 
-        wait = wait_fixed(data.retry_delay) + wait_random(0.1, 1) if data.retry_delay else wait_fixed(0)
-        retry = AsyncRetrying(
-            stop=stop_after_attempt(data.retries),
-            after=functools.partial(self._retry_handler, data),
-            retry_error_callback=functools.partial(self._retry_handler, data),
-            wait=wait,
-        )
-        return await retry.wraps(functools.partial(self._do_request, data))()
+            wait = wait_fixed(data.retry_delay) + wait_random(0.1, 1) if data.retry_delay else wait_fixed(0)
+            retry = AsyncRetrying(
+                stop=stop_after_attempt(data.retries),
+                after=functools.partial(self._retry_handler, data),
+                retry_error_callback=functools.partial(self._retry_handler, data),
+                wait=wait,
+            )
+            return await retry.wraps(functools.partial(self._do_request, data))()
+        except RequestException as e:
+            raise e.with_traceback(None) from None
 
     async def stream(
         self,
@@ -439,7 +442,10 @@ class Net:
             raise_status=raise_status,
             allow_redirects=allow_redirects,
         )
-        return await self._engine.stream(data)
+        try:
+            return await self._engine.stream(data)
+        except RequestException as e:
+            raise e.with_traceback(None) from None
 
     async def get(self, url: str, *, params: dict = None, **kwargs) -> Response:
         """发起 GET 请求。
