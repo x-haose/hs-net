@@ -54,9 +54,7 @@ class SyncRequestsEngine(SyncEngineBase):
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
-        proxy = engine_options.get("proxy")
-        if proxy:
-            self.client.proxies = {"http": proxy, "https": proxy}
+        self._proxy = engine_options.get("proxy")
 
     def close(self):
         """关闭 requests 会话。"""
@@ -95,6 +93,7 @@ class SyncRequestsEngine(SyncEngineBase):
                 files=request_data.files,
                 cookies=request_data.cookies,
                 headers=request_data.headers,
+                proxies={"http": self._proxy, "https": self._proxy} if self._proxy else None,
                 timeout=request_data.timeout,
                 allow_redirects=request_data.allow_redirects,
             )

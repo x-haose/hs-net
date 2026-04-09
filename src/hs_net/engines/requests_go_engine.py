@@ -50,9 +50,7 @@ class RequestsGoEngine(EngineBase):
         self.client.verify = self._verify
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
-        proxy = engine_options.get("proxy")
-        if proxy:
-            self.client.proxies = {"http": proxy, "https": proxy}
+        self._proxy = engine_options.get("proxy")
 
     async def close(self):
         """关闭 requests-go 客户端。"""
@@ -82,7 +80,10 @@ class RequestsGoEngine(EngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            response = await self.client.async_request(**build_common_request_kwargs(request_data))
+            kwargs = build_common_request_kwargs(request_data)
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
+            response = await self.client.async_request(**kwargs)
             return build_response(
                 url=str(response.url),
                 status_code=response.status_code,
@@ -114,6 +115,8 @@ class RequestsGoEngine(EngineBase):
         try:
             kwargs = build_common_request_kwargs(request_data)
             kwargs["stream"] = True
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
             response = await self.client.async_request(**kwargs)
 
             if not response.ok and request_data.raise_status:
@@ -165,9 +168,7 @@ class SyncRequestsGoEngine(SyncEngineBase):
         self.client.verify = self._verify
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
-        proxy = engine_options.get("proxy")
-        if proxy:
-            self.client.proxies = {"http": proxy, "https": proxy}
+        self._proxy = engine_options.get("proxy")
 
     def close(self):
         """关闭 requests-go 客户端。"""
@@ -197,7 +198,10 @@ class SyncRequestsGoEngine(SyncEngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            response = self.client.request(**build_common_request_kwargs(request_data))
+            kwargs = build_common_request_kwargs(request_data)
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
+            response = self.client.request(**kwargs)
             return build_response(
                 url=str(response.url),
                 status_code=response.status_code,
@@ -229,6 +233,8 @@ class SyncRequestsGoEngine(SyncEngineBase):
         try:
             kwargs = build_common_request_kwargs(request_data)
             kwargs["stream"] = True
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
             response = self.client.request(**kwargs)
 
             if not response.ok and request_data.raise_status:
