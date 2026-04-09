@@ -142,15 +142,14 @@ class Net:
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
-        # 处理 ProxyService
+        # 所有代理统一走 ProxyService
         self._proxy_service: ProxyService | None = None
         proxy = proxy if proxy is not None else (config.proxy if config else None)
         if isinstance(proxy, ProxyService):
             self._proxy_service = proxy
-            proxy = None  # 延迟到 __aenter__ 启动后获取 local_url
-        elif isinstance(proxy, list):
+        elif isinstance(proxy, str | list):
             self._proxy_service = ProxyService(proxy)
-            proxy = None
+        proxy = None  # 代理由 __aenter__ 启动 ProxyService 后注入
 
         self._config = merge_config(
             config,
@@ -186,9 +185,8 @@ class Net:
         sem = Semaphore(self._config.concurrency) if self._config.concurrency else None
         engine_cls = _resolve_async_engine_cls(self._config.engine)
         engine_options = dict(self._config.engine_options)
-        effective_proxy = proxy or self._config.proxy
-        if effective_proxy:
-            engine_options["proxy"] = effective_proxy
+        if proxy:
+            engine_options["proxy"] = proxy
         return engine_cls(
             sem=sem,
             headers=self._config.headers,

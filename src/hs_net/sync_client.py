@@ -136,18 +136,17 @@ class SyncNet:
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
-        # 处理 ProxyService
+        # 所有代理统一走 ProxyService
         self._proxy_service: ProxyService | None = None
         proxy = proxy if proxy is not None else (config.proxy if config else None)
         if isinstance(proxy, ProxyService):
             self._proxy_service = proxy
-            if not proxy.started:
-                proxy.start()
-            proxy = proxy.local_url
-        elif isinstance(proxy, list):
+        elif isinstance(proxy, str | list):
             self._proxy_service = ProxyService(proxy)
-            self._proxy_service.start()
-            proxy = self._proxy_service.local_url
+        if self._proxy_service:
+            if not self._proxy_service.started:
+                self._proxy_service.start()
+            proxy = None  # 代理由引擎 engine_options 注入
 
         self._config = merge_config(
             config,
@@ -173,8 +172,6 @@ class SyncNet:
         engine_options = dict(self._config.engine_options)
         if self._proxy_service and self._proxy_service.started:
             engine_options["proxy"] = self._proxy_service.local_url
-        elif self._config.proxy:
-            engine_options["proxy"] = self._config.proxy
         self._engine = engine_cls(
             sem=sem,
             headers=self._config.headers,

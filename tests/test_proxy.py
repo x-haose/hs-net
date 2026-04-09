@@ -204,11 +204,12 @@ class TestClientIntegration:
         net.close()
 
     def test_sync_net_with_proxy_string(self):
-        """字符串代理走传统路径，不创建 ProxyService。"""
+        """字符串代理也统一走 ProxyService。"""
         from hs_net.sync_client import SyncNet
 
         net = SyncNet(proxy="http://127.0.0.1:8080", verify=False, retries=0)
-        assert net.proxy_service is None
+        assert net.proxy_service is not None
+        assert net.proxy_service.started
         net.close()
 
     @pytest.mark.asyncio
