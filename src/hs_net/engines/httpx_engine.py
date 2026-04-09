@@ -37,11 +37,13 @@ class HttpxEngine(EngineBase):
         """
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        proxy = engine_options.get("proxy")
         self.client = AsyncClient(
             verify=self._verify,
             http2=engine_options.get("http2", True),
             headers=self._default_headers,
             cookies=self._default_cookies,
+            proxy=proxy,
         )
 
     async def close(self):
@@ -172,11 +174,13 @@ class SyncHttpxEngine(SyncEngineBase):
         """
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        proxy = engine_options.get("proxy")
         self.client = Client(
             verify=self._verify,
             http2=engine_options.get("http2", True),
             headers=self._default_headers,
             cookies=self._default_cookies,
+            proxy=proxy,
         )
 
     def close(self):

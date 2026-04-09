@@ -27,7 +27,7 @@ class NetConfig:
         retries: 请求失败后的重试次数。
         retry_delay: 重试间隔时间（秒），为 0 则立即重试。
         user_agent: User-Agent 配置，支持 "random"、"chrome" 等快捷方式。
-        proxy: 全局代理地址。
+        proxy: 全局代理，支持字符串、列表、ProxyService。
         verify: 是否验证 SSL 证书，默认开启。
         raise_status: 状态码非 2xx 时是否抛出异常。
         allow_redirects: 是否允许自动重定向。
@@ -44,7 +44,7 @@ class NetConfig:
     retries: int = 3
     retry_delay: float = 0.0
     user_agent: str = "random"
-    proxy: str | None = None
+    proxy: str | list[str] | Any | None = None  # str, list[str], ProxyService, or None
     verify: bool = True
     raise_status: bool = True
     allow_redirects: bool = True

@@ -18,6 +18,7 @@ from hs_net.exceptions import (
     TimeoutException,
 )
 from hs_net.models import EngineEnum, RequestModel
+from hs_net.proxy import ProxyProvider, ProxyService
 from hs_net.rate_limit import RateLimitConfig
 from hs_net.response import Response, Selector, SelectorList, StreamResponse
 from hs_net.shortcuts import (
@@ -45,6 +46,8 @@ __all__ = [
     "SyncNet",
     "NetConfig",
     "RateLimitConfig",
+    "ProxyService",
+    "ProxyProvider",
     "EngineEnum",
     "RequestModel",
     "Response",

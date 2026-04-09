@@ -14,6 +14,7 @@ from hs_net.engines.base import SyncEngineBase
 from hs_net.engines.httpx_engine import SyncHttpxEngine
 from hs_net.exceptions import RetryExhausted
 from hs_net.models import EngineEnum, RequestModel
+from hs_net.proxy import ProxyService
 from hs_net.rate_limit import RateLimitConfig, SyncRateLimitManager
 from hs_net.response import Response
 from hs_net.response.stream import StreamResponse
@@ -101,7 +102,7 @@ class SyncNet:
         retries: int = None,
         retry_delay: float = None,
         user_agent: str = None,
-        proxy: str = None,
+        proxy: str | list[str] | ProxyService = None,
         verify: bool = None,
         raise_status: bool = None,
         allow_redirects: bool = None,
@@ -124,7 +125,7 @@ class SyncNet:
             retries: 请求失败后的重试次数。
             retry_delay: 重试间隔时间（秒）。
             user_agent: User-Agent，支持 "random"、"chrome" 等快捷方式。
-            proxy: 全局代理地址。
+            proxy: 代理配置，支持字符串、列表或 ProxyService。
             verify: 是否验证 SSL 证书。
             raise_status: 状态码非 2xx 时是否抛出异常。
             allow_redirects: 是否允许自动重定向。
@@ -135,6 +136,19 @@ class SyncNet:
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
+        # 处理 ProxyService
+        self._proxy_service: ProxyService | None = None
+        proxy = proxy if proxy is not None else (config.proxy if config else None)
+        if isinstance(proxy, ProxyService):
+            self._proxy_service = proxy
+            if not proxy.started:
+                proxy.start()
+            proxy = proxy.local_url
+        elif isinstance(proxy, list):
+            self._proxy_service = ProxyService(proxy)
+            self._proxy_service.start()
+            proxy = self._proxy_service.local_url
+
         self._config = merge_config(
             config,
             engine=engine,
@@ -156,12 +170,17 @@ class SyncNet:
 
         sem = ThreadSemaphore(self._config.concurrency) if self._config.concurrency else None
         engine_cls = _resolve_sync_engine_cls(self._config.engine)
+        engine_options = dict(self._config.engine_options)
+        if self._proxy_service and self._proxy_service.started:
+            engine_options["proxy"] = self._proxy_service.local_url
+        elif self._config.proxy:
+            engine_options["proxy"] = self._config.proxy
         self._engine = engine_cls(
             sem=sem,
             headers=self._config.headers,
             cookies=self._config.cookies,
             verify=self._config.verify,
-            **self._config.engine_options,
+            **engine_options,
         )
 
         self._closed = False
@@ -182,12 +201,19 @@ class SyncNet:
         """
         return self._engine.cookies
 
+    @property
+    def proxy_service(self) -> ProxyService | None:
+        """获取代理服务实例。"""
+        return self._proxy_service
+
     def close(self):
-        """关闭客户端，释放底层引擎资源。"""
+        """关闭客户端，释放底层引擎和代理服务资源。"""
         if self._closed:
             return
         self._closed = True
         self._engine.close()
+        if self._proxy_service and self._proxy_service.started:
+            self._proxy_service.stop()
 
     def __del__(self):
         if not self._closed:

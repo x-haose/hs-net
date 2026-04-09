@@ -14,6 +14,7 @@ from hs_net.engines.base import EngineBase
 from hs_net.engines.httpx_engine import HttpxEngine
 from hs_net.exceptions import RetryExhausted
 from hs_net.models import EngineEnum, RequestModel
+from hs_net.proxy import ProxyService
 from hs_net.rate_limit import RateLimitConfig, RateLimitManager
 from hs_net.response import Response
 from hs_net.response.stream import StreamResponse
@@ -107,7 +108,7 @@ class Net:
         retries: int = None,
         retry_delay: float = None,
         user_agent: str = None,
-        proxy: str = None,
+        proxy: str | list[str] | ProxyService = None,
         verify: bool = None,
         raise_status: bool = None,
         allow_redirects: bool = None,
@@ -130,7 +131,7 @@ class Net:
             retries: 请求失败后的重试次数。
             retry_delay: 重试间隔时间（秒）。
             user_agent: User-Agent，支持 "random"、"chrome" 等快捷方式。
-            proxy: 全局代理地址。
+            proxy: 代理配置，支持字符串、列表或 ProxyService。
             verify: 是否验证 SSL 证书。
             raise_status: 状态码非 2xx 时是否抛出异常。
             allow_redirects: 是否允许自动重定向。
@@ -141,6 +142,16 @@ class Net:
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
+        # 处理 ProxyService
+        self._proxy_service: ProxyService | None = None
+        proxy = proxy if proxy is not None else (config.proxy if config else None)
+        if isinstance(proxy, ProxyService):
+            self._proxy_service = proxy
+            proxy = None  # 延迟到 __aenter__ 启动后获取 local_url
+        elif isinstance(proxy, list):
+            self._proxy_service = ProxyService(proxy)
+            proxy = None
+
         self._config = merge_config(
             config,
             engine=engine,
@@ -160,16 +171,7 @@ class Net:
             engine_options=engine_options,
         )
 
-        sem = Semaphore(self._config.concurrency) if self._config.concurrency else None
-        engine_cls = _resolve_async_engine_cls(self._config.engine)
-        self._engine = engine_cls(
-            sem=sem,
-            headers=self._config.headers,
-            cookies=self._config.cookies,
-            verify=self._config.verify,
-            **self._config.engine_options,
-        )
-
+        self._engine = self._create_engine()
         self._closed = False
         self._rate_limiter = _build_rate_limiter(self._config.rate_limit)
 
@@ -178,6 +180,22 @@ class Net:
         self.on_request_before = self._signals.on_request_before
         self.on_response_after = self._signals.on_response_after
         self.on_request_retry = self._signals.on_request_retry
+
+    def _create_engine(self, proxy: str | None = None) -> EngineBase:
+        """创建引擎实例。"""
+        sem = Semaphore(self._config.concurrency) if self._config.concurrency else None
+        engine_cls = _resolve_async_engine_cls(self._config.engine)
+        engine_options = dict(self._config.engine_options)
+        effective_proxy = proxy or self._config.proxy
+        if effective_proxy:
+            engine_options["proxy"] = effective_proxy
+        return engine_cls(
+            sem=sem,
+            headers=self._config.headers,
+            cookies=self._config.cookies,
+            verify=self._config.verify,
+            **engine_options,
+        )
 
     @property
     def cookies(self) -> dict[str, str]:
@@ -188,12 +206,19 @@ class Net:
         """
         return self._engine.cookies
 
+    @property
+    def proxy_service(self) -> ProxyService | None:
+        """获取代理服务实例。"""
+        return self._proxy_service
+
     async def close(self):
-        """关闭客户端，释放底层引擎资源。"""
+        """关闭客户端，释放底层引擎和代理服务资源。"""
         if self._closed:
             return
         self._closed = True
         await self._engine.close()
+        if self._proxy_service and self._proxy_service.started:
+            await self._proxy_service.async_stop()
 
     def __del__(self):
         if not self._closed:
@@ -202,6 +227,14 @@ class Net:
             warnings.warn(f"未关闭的 {self!r}，请使用 async with 或手动调用 close()", ResourceWarning, stacklevel=2)
 
     async def __aenter__(self):
+        if self._closed:
+            raise RuntimeError("客户端已关闭，不能重复使用")
+        if self._proxy_service:
+            if not self._proxy_service.started:
+                await self._proxy_service.async_start()
+            # ProxyService 启动后重建引擎，让引擎连接本地代理
+            await self._engine.close()
+            self._engine = self._create_engine(proxy=self._proxy_service.local_url)
         return self
 
     async def __aexit__(self, *exc):
