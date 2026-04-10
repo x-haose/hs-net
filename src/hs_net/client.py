@@ -279,6 +279,10 @@ class Net:
         if self._rate_limiter:
             await self._rate_limiter.acquire(data.url)
 
+        # 身份路由：根据请求内容解析代理地址
+        if self._proxy_service and self._proxy_service.identity_extractor:
+            data.proxy = await self._proxy_service.resolve(data)
+
         # 请求前信号
         async for _receiver, result in self._signals.send(self._signals.request_before, data):
             if isinstance(result, RequestModel):

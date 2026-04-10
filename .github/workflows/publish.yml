@@ -46,6 +46,8 @@ jobs:
     environment: pypi
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -54,10 +56,10 @@ jobs:
         run: uv python install 3.13
 
       - name: Build package
-        run: uv build
+        run: uv build --out-dir release-dist/
 
       - name: Publish to PyPI
-        run: uv publish
+        run: uv publish release-dist/*
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
@@ -84,5 +86,5 @@ jobs:
         with:
           tag_name: "v${{ steps.version.outputs.version }}"
           name: "v${{ steps.version.outputs.version }}"
-          files: dist/*
+          files: release-dist/*
           body: ${{ steps.changelog.outputs.content }}

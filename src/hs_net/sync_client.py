@@ -265,6 +265,10 @@ class SyncNet:
         if self._rate_limiter:
             self._rate_limiter.acquire(data.url)
 
+        # 身份路由：根据请求内容解析代理地址
+        if self._proxy_service and self._proxy_service.identity_extractor:
+            data.proxy = self._proxy_service.resolve_sync(data)
+
         # 请求前信号
         for _receiver, result in self._signals.send_sync(self._signals.request_before, data):
             if isinstance(result, RequestModel):
