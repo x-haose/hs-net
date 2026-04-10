@@ -272,9 +272,7 @@ class SyncNet:
             elif isinstance(result, Response):
                 return result
 
-        logger.debug(
-            f"[{data.method}] {data.url} " f"params={data.url_params} json={data.json_data} form={data.form_data}"
-        )
+        logger.debug(f"[{data.method}] {data.url} params={data.url_params} json={data.json_data} form={data.form_data}")
 
         resp = self._engine.download(data)
 
