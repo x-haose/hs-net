@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from hs_net.models import RequestModel
 from hs_net.proxy import (
     ApiProxyProvider,
     FixedProxyProvider,
@@ -543,3 +544,217 @@ class TestProxyServiceRules:
         assert isinstance(info, _ProxyInfo)
         assert info.scheme == "socks5"
         assert info.host == "proxy1"
+
+
+# ===========================================================================
+# 身份路由测试
+# ===========================================================================
+
+
+class TestIdentityExtractor:
+    """身份路由 identity_extractor 测试。"""
+
+    def _make_request(self, cookies=None, headers=None, url_params=None):
+        return RequestModel(
+            url="https://example.com",
+            cookies=cookies or {},
+            headers=headers or {},
+            url_params=url_params,
+        )
+
+    def test_no_identity_extractor(self):
+        """未配置 identity_extractor 时行为不变。"""
+        svc = ProxyService("http://127.0.0.1:8080")
+        svc.start()
+        assert svc.identity_extractor is None
+        svc.stop()
+
+    def test_identity_extractor_property(self):
+        """identity_extractor 属性正确返回。"""
+        extractor = lambda req: req.cookies.get("sid")  # noqa: E731
+        svc = ProxyService("http://127.0.0.1:8080", identity_extractor=extractor)
+        assert svc.identity_extractor is extractor
+
+    async def test_resolve_without_extractor(self):
+        """无 identity_extractor 时 resolve 返回基础 local_url。"""
+        svc = ProxyService("http://127.0.0.1:8080")
+        await svc.async_start()
+        try:
+            req = self._make_request()
+            url = await svc.resolve(req)
+            assert url == svc.local_url
+        finally:
+            await svc.async_stop()
+
+    async def test_resolve_extractor_returns_none(self):
+        """identity_extractor 返回 None 时走默认代理。"""
+        extractor = lambda req: None  # noqa: E731
+        svc = ProxyService("http://127.0.0.1:8080", identity_extractor=extractor)
+        await svc.async_start()
+        try:
+            req = self._make_request()
+            url = await svc.resolve(req)
+            assert url == svc.local_url
+        finally:
+            await svc.async_stop()
+
+    async def test_resolve_sticky_binding(self):
+        """同一身份始终返回相同代理 URL（sticky）。"""
+        proxies = iter(["http://proxy1:8080", "http://proxy2:8080", "http://proxy3:8080"])
+
+        class SeqProvider(ProxyProvider):
+            def get_proxy(self):
+                return next(proxies)
+
+            async def async_get_proxy(self):
+                return next(proxies)
+
+        extractor = lambda req: req.cookies.get("sid")  # noqa: E731
+        svc = ProxyService(provider=SeqProvider(), identity_extractor=extractor)
+        await svc.async_start()
+        try:
+            req_a1 = self._make_request(cookies={"sid": "aaa"})
+            req_a2 = self._make_request(cookies={"sid": "aaa"})
+            req_b = self._make_request(cookies={"sid": "bbb"})
+
+            url_a1 = await svc.resolve(req_a1)
+            url_a2 = await svc.resolve(req_a2)
+            url_b = await svc.resolve(req_b)
+
+            # 同一身份返回相同 URL
+            assert url_a1 == url_a2
+            # 不同身份返回不同 URL
+            assert url_a1 != url_b
+            # 都包含 identity hash
+            assert "@127.0.0.1:" in url_a1
+            assert "@127.0.0.1:" in url_b
+        finally:
+            await svc.async_stop()
+
+    async def test_resolve_proxy_auth_bridge(self):
+        """resolve 返回的 URL 包含正确的 identity_hash。"""
+        import hashlib
+
+        extractor = lambda req: req.cookies.get("sid")  # noqa: E731
+        svc = ProxyService("http://127.0.0.1:8080", identity_extractor=extractor)
+        await svc.async_start()
+        try:
+            req = self._make_request(cookies={"sid": "test_identity"})
+            url = await svc.resolve(req)
+
+            expected_hash = hashlib.md5(b"test_identity").hexdigest()  # noqa: S324
+            assert expected_hash in url
+            assert url.startswith(f"http://{expected_hash}:x@127.0.0.1:")
+        finally:
+            await svc.async_stop()
+
+    async def test_identity_from_headers(self):
+        """从 headers 提取身份。"""
+        extractor = lambda req: req.headers.get("Authorization")  # noqa: E731
+        svc = ProxyService("http://127.0.0.1:8080", identity_extractor=extractor)
+        await svc.async_start()
+        try:
+            req = self._make_request(headers={"Authorization": "Bearer token_abc"})
+            url = await svc.resolve(req)
+            assert "@127.0.0.1:" in url
+        finally:
+            await svc.async_stop()
+
+    async def test_identity_from_url_params(self):
+        """从 URL 参数提取身份。"""
+        extractor = lambda req: (req.url_params or {}).get("token")  # noqa: E731
+        svc = ProxyService("http://127.0.0.1:8080", identity_extractor=extractor)
+        await svc.async_start()
+        try:
+            req = self._make_request(url_params={"token": "my_token"})
+            url = await svc.resolve(req)
+            assert "@127.0.0.1:" in url
+        finally:
+            await svc.async_stop()
+
+
+class TestProxyServerIdentity:
+    """_ProxyServer 身份上游测试。"""
+
+    def test_register_and_resolve(self):
+        """注册身份后 _resolve_upstream 返回对应上游。"""
+        from hs_net.proxy import _ProxyInfo, _ProxyServer
+
+        server = _ProxyServer()
+        default_info = _ProxyInfo(scheme="http", host="default", port=8080, username=None, password=None)
+        identity_info = _ProxyInfo(scheme="socks5", host="identity-proxy", port=1080, username=None, password=None)
+        server.set_upstream(default_info)
+        server.register_identity("abc123", identity_info)
+
+        # 有身份 → 返回身份上游
+        result = server._resolve_upstream("example.com", identity_hash="abc123")
+        assert result == identity_info
+
+        # 无身份 → 返回默认上游
+        result = server._resolve_upstream("example.com")
+        assert result == default_info
+
+        # 未注册的身份 → 返回默认上游
+        result = server._resolve_upstream("example.com", identity_hash="unknown")
+        assert result == default_info
+
+    def test_domain_rules_override_identity(self):
+        """域名路由优先于身份路由。"""
+        from hs_net.proxy import DIRECT, _ProxyInfo, _ProxyServer
+
+        server = _ProxyServer()
+        default_info = _ProxyInfo(scheme="http", host="default", port=8080, username=None, password=None)
+        identity_info = _ProxyInfo(scheme="http", host="identity-proxy", port=8080, username=None, password=None)
+        server.set_upstream(default_info)
+        server.register_identity("user_a", identity_info)
+        server.set_rules([("*.cn", DIRECT)])
+
+        # 域名命中 rules → DIRECT，即使有身份
+        result = server._resolve_upstream("baidu.cn", identity_hash="user_a")
+        assert result is DIRECT
+
+        # 域名未命中 rules → 走身份上游
+        result = server._resolve_upstream("google.com", identity_hash="user_a")
+        assert result == identity_info
+
+
+class TestExtractProxyAuth:
+    """_extract_proxy_auth 辅助函数测试。"""
+
+    def test_extract_basic_auth(self):
+        """正确提取 Proxy-Authorization 的 username。"""
+        import base64
+
+        from hs_net.proxy import _extract_proxy_auth
+
+        credentials = base64.b64encode(b"my_hash:x").decode()
+        header_lines = [
+            b"CONNECT example.com:443 HTTP/1.1\r\n",
+            f"Proxy-Authorization: Basic {credentials}\r\n".encode(),
+            b"\r\n",
+        ]
+        assert _extract_proxy_auth(header_lines) == "my_hash"
+
+    def test_no_proxy_auth(self):
+        """无 Proxy-Authorization 时返回 None。"""
+        from hs_net.proxy import _extract_proxy_auth
+
+        header_lines = [
+            b"CONNECT example.com:443 HTTP/1.1\r\n",
+            b"Host: example.com:443\r\n",
+            b"\r\n",
+        ]
+        assert _extract_proxy_auth(header_lines) is None
+
+    def test_empty_username(self):
+        """username 为空时返回 None。"""
+        import base64
+
+        from hs_net.proxy import _extract_proxy_auth
+
+        credentials = base64.b64encode(b":password").decode()
+        header_lines = [
+            f"Proxy-Authorization: Basic {credentials}\r\n".encode(),
+            b"\r\n",
+        ]
+        assert _extract_proxy_auth(header_lines) is None

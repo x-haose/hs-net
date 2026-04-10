@@ -38,16 +38,35 @@ class HttpxEngine(EngineBase):
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         proxy = engine_options.get("proxy")
+        self._http2 = engine_options.get("http2", True)
         self.client = AsyncClient(
             verify=self._verify,
-            http2=engine_options.get("http2", True),
+            http2=self._http2,
             headers=self._default_headers,
             cookies=self._default_cookies,
             proxy=proxy,
         )
+        self._proxy_clients: dict[str, AsyncClient] = {}
+
+    def _get_client(self, proxy: str | None) -> AsyncClient:
+        """获取对应代理的 httpx 客户端，支持 per-request 代理（身份路由场景）。"""
+        if not proxy:
+            return self.client
+        if proxy not in self._proxy_clients:
+            self._proxy_clients[proxy] = AsyncClient(
+                verify=self._verify,
+                http2=self._http2,
+                headers=self._default_headers,
+                cookies=self._default_cookies,
+                proxy=proxy,
+            )
+        return self._proxy_clients[proxy]
 
     async def close(self):
         """关闭 httpx 客户端。"""
+        for client in self._proxy_clients.values():
+            await client.aclose()
+        self._proxy_clients.clear()
         await self.client.aclose()
 
     @property
@@ -74,7 +93,8 @@ class HttpxEngine(EngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            request = self.client.build_request(
+            client = self._get_client(request_data.proxy)
+            request = client.build_request(
                 request_data.method,
                 request_data.url,
                 headers=request_data.headers,
@@ -85,7 +105,7 @@ class HttpxEngine(EngineBase):
                 json=request_data.json_data,
                 files=request_data.files,
             )
-            response = await self.client.send(request, follow_redirects=request_data.allow_redirects)
+            response = await client.send(request, follow_redirects=request_data.allow_redirects)
             return build_response(
                 url=str(response.url),
                 status_code=response.status_code,
@@ -115,7 +135,8 @@ class HttpxEngine(EngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            request = self.client.build_request(
+            client = self._get_client(request_data.proxy)
+            request = client.build_request(
                 request_data.method,
                 request_data.url,
                 headers=request_data.headers,
@@ -126,7 +147,7 @@ class HttpxEngine(EngineBase):
                 json=request_data.json_data,
                 files=request_data.files,
             )
-            response = await self.client.send(
+            response = await client.send(
                 request,
                 follow_redirects=request_data.allow_redirects,
                 stream=True,
@@ -175,16 +196,35 @@ class SyncHttpxEngine(SyncEngineBase):
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
         proxy = engine_options.get("proxy")
+        self._http2 = engine_options.get("http2", True)
         self.client = Client(
             verify=self._verify,
-            http2=engine_options.get("http2", True),
+            http2=self._http2,
             headers=self._default_headers,
             cookies=self._default_cookies,
             proxy=proxy,
         )
+        self._proxy_clients: dict[str, Client] = {}
+
+    def _get_client(self, proxy: str | None) -> Client:
+        """获取对应代理的 httpx 客户端，支持 per-request 代理（身份路由场景）。"""
+        if not proxy:
+            return self.client
+        if proxy not in self._proxy_clients:
+            self._proxy_clients[proxy] = Client(
+                verify=self._verify,
+                http2=self._http2,
+                headers=self._default_headers,
+                cookies=self._default_cookies,
+                proxy=proxy,
+            )
+        return self._proxy_clients[proxy]
 
     def close(self):
         """关闭 httpx 客户端。"""
+        for client in self._proxy_clients.values():
+            client.close()
+        self._proxy_clients.clear()
         self.client.close()
 
     @property
@@ -211,7 +251,8 @@ class SyncHttpxEngine(SyncEngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            request = self.client.build_request(
+            client = self._get_client(request_data.proxy)
+            request = client.build_request(
                 request_data.method,
                 request_data.url,
                 headers=request_data.headers,
@@ -222,7 +263,7 @@ class SyncHttpxEngine(SyncEngineBase):
                 json=request_data.json_data,
                 files=request_data.files,
             )
-            response = self.client.send(request, follow_redirects=request_data.allow_redirects)
+            response = client.send(request, follow_redirects=request_data.allow_redirects)
             return build_response(
                 url=str(response.url),
                 status_code=response.status_code,
@@ -252,7 +293,8 @@ class SyncHttpxEngine(SyncEngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            request = self.client.build_request(
+            client = self._get_client(request_data.proxy)
+            request = client.build_request(
                 request_data.method,
                 request_data.url,
                 headers=request_data.headers,
@@ -263,7 +305,7 @@ class SyncHttpxEngine(SyncEngineBase):
                 json=request_data.json_data,
                 files=request_data.files,
             )
-            response = self.client.send(
+            response = client.send(
                 request,
                 follow_redirects=request_data.allow_redirects,
                 stream=True,

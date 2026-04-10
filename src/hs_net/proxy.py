@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import hashlib
 import itertools
 import logging
 import random  # noqa: S311
@@ -39,6 +40,8 @@ from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     import httpx
+
+    from hs_net.models import RequestModel
 
 logger = logging.getLogger("hs_net.proxy")
 
@@ -607,6 +610,29 @@ async def _relay(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             writer.close()
 
 
+def _extract_proxy_auth(header_lines: list[bytes]) -> str | None:
+    """从 headers 中提取 Proxy-Authorization 的 username 作为身份标识。
+
+    Args:
+        header_lines: 原始 header 行列表。
+
+    Returns:
+        username 字符串（identity_hash），未找到则返回 None。
+    """
+    for line in header_lines:
+        if line == b"\r\n":
+            continue
+        lower = line.lower()
+        if lower.startswith(b"proxy-authorization:"):
+            value = line.split(b":", 1)[1].strip()
+            if value.lower().startswith(b"basic "):
+                encoded = value.split(b" ", 1)[1].strip()
+                decoded = base64.b64decode(encoded).decode()
+                username = decoded.split(":", 1)[0]
+                return username if username else None
+    return None
+
+
 class _ProxyServer:
     """异步本地 HTTP 代理服务器，内部使用。"""
 
@@ -614,6 +640,7 @@ class _ProxyServer:
         self._proxy_info: _ProxyInfo | None = None
         self._transit_info: _ProxyInfo | None = None
         self._rules: list[tuple[str, _ProxyInfo | _DirectType]] = []
+        self._identity_upstreams: dict[str, _ProxyInfo] = {}
         self._server: asyncio.Server | None = None
         self._port: int = 0
         self._client_tasks: set[asyncio.Task] = set()
@@ -638,19 +665,41 @@ class _ProxyServer:
         """设置域名路由规则。"""
         self._rules = rules
 
-    def _resolve_upstream(self, domain: str) -> _ProxyInfo | _DirectType:
-        """根据域名解析上游代理。
+    def register_identity(self, identity_hash: str, proxy_info: _ProxyInfo) -> None:
+        """注册身份与上游代理的绑定。
+
+        Args:
+            identity_hash: 身份标识哈希。
+            proxy_info: 绑定的上游代理信息。
+        """
+        self._identity_upstreams[identity_hash] = proxy_info
+        logger.debug(
+            f"注册身份上游: {identity_hash[:8]}... → {proxy_info.scheme}://{proxy_info.host}:{proxy_info.port}"
+        )
+
+    def _resolve_upstream(self, domain: str, identity_hash: str | None = None) -> _ProxyInfo | _DirectType:
+        """根据身份和域名解析上游代理。
+
+        优先级：域名路由 > 身份路由 > 默认上游。
 
         Args:
             domain: 目标域名。
+            identity_hash: 身份标识哈希，为 None 时跳过身份路由。
 
         Returns:
             _ProxyInfo 走对应代理，DIRECT 直连。
         """
+        # 1. 域名路由优先
         if self._rules:
             matched = _match_domain(domain, self._rules)
             if matched is not None:
                 return matched
+
+        # 2. 身份路由
+        if identity_hash and identity_hash in self._identity_upstreams:
+            return self._identity_upstreams[identity_hash]
+
+        # 3. 默认上游
         return self._proxy_info
 
     async def _handle_client(
@@ -691,13 +740,16 @@ class _ProxyServer:
 
                 method = parts[0]
 
+                # 提取身份标识（从 Proxy-Authorization header）
+                identity_hash = _extract_proxy_auth(header_lines)
+
                 if method == "CONNECT":
                     # CONNECT 隧道独占连接，处理完不再循环
-                    await self._handle_connect(client_reader, client_writer, parts)
+                    await self._handle_connect(client_reader, client_writer, parts, identity_hash)
                     break
                 else:
                     # HTTP 转发，处理完一个请求后继续循环读下一个
-                    await self._handle_http_forward(client_writer, header_lines)
+                    await self._handle_http_forward(client_writer, header_lines, identity_hash)
 
         except Exception as e:
             logger.debug(f"代理连接处理异常: {e}")
@@ -713,6 +765,7 @@ class _ProxyServer:
         client_reader: asyncio.StreamReader,
         client_writer: asyncio.StreamWriter,
         parts: list[str],
+        identity_hash: str | None = None,
     ) -> None:
         """处理 CONNECT 隧道（HTTPS）。"""
         target = parts[1]
@@ -723,8 +776,8 @@ class _ProxyServer:
             target_host = target
             target_port = 443
 
-        # 根据域名解析上游
-        upstream_info = self._resolve_upstream(target_host)
+        # 根据身份和域名解析上游
+        upstream_info = self._resolve_upstream(target_host, identity_hash)
 
         if isinstance(upstream_info, _DirectType):
             # 直连目标
@@ -756,8 +809,17 @@ class _ProxyServer:
         self,
         client_writer: asyncio.StreamWriter,
         header_lines: list[bytes],
+        identity_hash: str | None = None,
     ) -> None:
         """处理单个 HTTP 请求转发，每次使用当前上游配置。"""
+        # 移除本地代理的 Proxy-Authorization（身份桥梁用，不转发给上游）
+        if identity_hash:
+            header_lines = [
+                line
+                for line in header_lines
+                if not (line != b"\r\n" and line.lower().startswith(b"proxy-authorization:"))
+            ]
+
         # 解析目标域名（所有分支都需要）
         request_line = header_lines[0].decode().strip()
         parts = request_line.split()
@@ -765,8 +827,8 @@ class _ProxyServer:
         target_host = url.hostname or ""
         target_port = url.port or 80
 
-        # 根据域名解析上游
-        upstream_info = self._resolve_upstream(target_host)
+        # 根据身份和域名解析上游
+        upstream_info = self._resolve_upstream(target_host, identity_hash)
 
         if isinstance(upstream_info, _DirectType):
             # 直连目标
@@ -888,6 +950,7 @@ class ProxyService:
         strategy: str = "round_robin",
         transit: str | None = None,
         rules: dict[str, str] | None = None,
+        identity_extractor: Callable[[RequestModel], str | None] | None = None,
     ):
         if provider:
             self._provider = provider
@@ -908,6 +971,9 @@ class ProxyService:
                     self._rules.append((pattern, DIRECT))
                 else:
                     self._rules.append((pattern, _parse_proxy(proxy_url)))
+
+        self._identity_extractor = identity_extractor
+        self._identity_map: dict[str, str] = {}  # identity_hash → proxy_url
 
         self._server: _ProxyServer | None = None
         self._started = False
@@ -937,6 +1003,80 @@ class ProxyService:
     def started(self) -> bool:
         """是否已启动。"""
         return self._started
+
+    @property
+    def identity_extractor(self) -> Callable[[RequestModel], str | None] | None:
+        """当前身份提取器。"""
+        return self._identity_extractor
+
+    async def resolve(self, request: RequestModel) -> str:
+        """根据请求内容解析代理地址（供 Client._do_request 调用）。
+
+        如果配置了 identity_extractor，会从请求中提取身份标识，
+        首次出现的身份自动从 provider 分配代理并 sticky 绑定。
+
+        Args:
+            request: 请求模型。
+
+        Returns:
+            本地代理 URL，可能带 proxy auth 编码身份信息。
+        """
+        if not self._started or not self._server:
+            raise RuntimeError("ProxyService 尚未启动")
+
+        if not self._identity_extractor:
+            return self.local_url
+
+        identity = self._identity_extractor(request)
+        if not identity:
+            return self.local_url
+
+        identity_hash = hashlib.md5(identity.encode(), usedforsecurity=False).hexdigest()
+
+        # 已绑定 → 直接返回
+        if identity_hash in self._identity_map:
+            return f"http://{identity_hash}:x@127.0.0.1:{self._server.port}"
+
+        # 首次出现 → 从 provider 分配，注册到 _ProxyServer
+        proxy_url = await self._provider.async_get_proxy()
+        proxy_info = _parse_proxy(proxy_url)
+        self._server.register_identity(identity_hash, proxy_info)
+        self._identity_map[identity_hash] = proxy_url
+        logger.info(f"身份 {identity_hash[:8]}... 绑定代理: {proxy_url}")
+
+        return f"http://{identity_hash}:x@127.0.0.1:{self._server.port}"
+
+    def resolve_sync(self, request: RequestModel) -> str:
+        """同步版本的 resolve，用于 SyncNet 场景。
+
+        Args:
+            request: 请求模型。
+
+        Returns:
+            本地代理 URL，可能带 proxy auth 编码身份信息。
+        """
+        if not self._started or not self._server:
+            raise RuntimeError("ProxyService 尚未启动")
+
+        if not self._identity_extractor:
+            return self.local_url
+
+        identity = self._identity_extractor(request)
+        if not identity:
+            return self.local_url
+
+        identity_hash = hashlib.md5(identity.encode(), usedforsecurity=False).hexdigest()
+
+        if identity_hash in self._identity_map:
+            return f"http://{identity_hash}:x@127.0.0.1:{self._server.port}"
+
+        proxy_url = self._provider.get_proxy()
+        proxy_info = _parse_proxy(proxy_url)
+        self._server.register_identity(identity_hash, proxy_info)
+        self._identity_map[identity_hash] = proxy_url
+        logger.info(f"身份 {identity_hash[:8]}... 绑定代理: {proxy_url}")
+
+        return f"http://{identity_hash}:x@127.0.0.1:{self._server.port}"
 
     def _init_upstream(self) -> None:
         """从 provider 同步获取代理并设置上游。"""
