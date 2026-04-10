@@ -13,5 +13,10 @@
     "text": "API 参考",
     "link": "/api/net",
     "activeMatch": "/api/"
+  },
+  {
+    "text": "示例",
+    "link": "/examples/basic/get",
+    "activeMatch": "/examples/"
   }
 ]

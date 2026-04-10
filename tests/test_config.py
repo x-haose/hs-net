@@ -18,7 +18,7 @@ class TestNetConfig:
         assert cfg.retry_delay == 0.0
         assert cfg.user_agent == "random"
         assert cfg.proxy is None
-        assert cfg.verify is True
+        assert cfg.verify is False
         assert cfg.raise_status is True
         assert cfg.allow_redirects is True
         assert cfg.concurrency is None

@@ -1,0 +1,52 @@
+"""
+请求前中间件 (on_request_before)
+
+在请求发送前执行，可用于添加 Header、记录日志、修改请求参数等。
+"""
+
+import asyncio
+
+from hs_net import Net, SyncNet
+
+# ==================== 同步：请求日志 ====================
+
+
+def log_example():
+    """记录每个请求的方法和 URL。"""
+    with SyncNet(retries=0) as net:
+
+        @net.on_request_before
+        def log_request(req_data):
+            print(f"  -> 发送请求: {req_data.method} {req_data.url}")
+
+        net.get("https://example.com")
+        net.get("https://example.com/?page=2")
+
+
+# ==================== 异步：自动添加 Header ====================
+
+
+async def header_example():
+    """请求前自动注入自定义 Header。"""
+    request_count = 0
+
+    async with Net(retries=0) as net:
+
+        @net.on_request_before
+        async def add_header(req_data):
+            nonlocal request_count
+            request_count += 1
+            req_data.headers["X-Request-ID"] = f"req-{request_count}"
+            print(f"  -> 请求 #{request_count}: {req_data.url}")
+
+        await net.get("https://example.com")
+        await net.get("https://example.com")
+        print(f"  共发送 {request_count} 个请求")
+
+
+if __name__ == "__main__":
+    print("=== 同步：请求日志 ===")
+    log_example()
+
+    print("\n=== 异步：自动添加 Header ===")
+    asyncio.run(header_example())

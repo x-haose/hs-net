@@ -1,5 +1,14 @@
 # 基本请求
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [异步请求](#异步请求) | async with Net 基本用法 | [`get.py`](https://github.com/x-haose/hs-net/blob/main/examples/basic/get.py) |
+| [同步请求](#同步请求) | with SyncNet 基本用法 | [`get.py`](https://github.com/x-haose/hs-net/blob/main/examples/basic/get.py) |
+| [Response 常用属性](#response-常用属性) | 响应对象的属性和方法 | — |
+| [带参数的请求](#带参数的请求) | params、headers、UA 等 | — |
+
 ## 异步请求
 
 ```python title="async_get.py"
@@ -83,9 +92,6 @@ with SyncNet() as net:
 
     # 自定义超时
     resp = net.get("https://example.com", timeout=5.0)
-
-    # 指定代理
-    resp = net.get("https://example.com", proxy="http://proxy:8080")
 
     # 自定义 User-Agent
     resp = net.get("https://example.com", user_agent="MyBot/1.0")

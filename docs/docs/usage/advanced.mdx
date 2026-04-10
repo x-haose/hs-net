@@ -1,5 +1,15 @@
 # 高级用法
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [base_url 拼接](#base_url-拼接) | 基础 URL 配置 | [`config.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/config.py) |
+| [并发控制](#并发控制) | concurrency 限制 | [`concurrency.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/concurrency.py) |
+| [重试配置](#重试配置) | retries / retry_delay | [`config.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/config.py) |
+| [Cookie 管理](#cookie-管理) | 会话 Cookie | [`cookie.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/cookie.py) |
+| [完整的 API 客户端示例](#完整的-api-客户端示例) | 综合实战 | [`api_client.py`](https://github.com/x-haose/hs-net/blob/main/examples/real_world/api_client.py) |
+
 ## base_url 拼接
 
 设置 `base_url` 后，请求路径会自动拼接：
@@ -72,11 +82,16 @@ with SyncNet(cookies={"init_token": "abc"}) as net:
 
 ## SSL 证书
 
-```python title="ssl.py"
-# 跳过 SSL 验证（开发环境）
-net = SyncNet(verify=False)
+hs-net 默认关闭 SSL 证书验证（`verify=False`），方便开发和爬虫场景：
 
-# 单次请求跳过
+```python title="ssl.py"
+# 默认不验证 SSL（无需额外配置）
+net = SyncNet()
+
+# 开启 SSL 验证（生产环境推荐）
+net = SyncNet(verify=True)
+
+# 单次请求覆盖
 resp = net.get("https://self-signed.example.com", verify=False)
 ```
 

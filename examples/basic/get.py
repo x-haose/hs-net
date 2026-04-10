@@ -1,0 +1,54 @@
+"""
+基本 GET 请求
+
+最简单的使用方式，发起 GET 请求并获取响应内容。
+"""
+
+import asyncio
+
+from hs_net import Net, SyncNet
+
+# ==================== 同步用法 ====================
+
+
+def sync_example():
+    """同步 GET 请求示例。"""
+    # 方式 1: 使用 with 语句（推荐，自动关闭连接）
+    with SyncNet(retries=0) as net:
+        resp = net.get("https://example.com")
+        print(f"状态码: {resp.status_code}")  # 200
+        print(f"是否成功: {resp.ok}")  # True
+        print(f"响应长度: {len(resp.text)} 字符")
+
+    # 方式 2: 手动管理
+    net = SyncNet(retries=0)
+    resp = net.get("https://example.com")
+    print(f"域名: {resp.domain}")  # https://example.com
+    print(f"主机: {resp.host}")  # example.com
+    net.close()
+
+
+# ==================== 异步用法 ====================
+
+
+async def async_example():
+    """异步 GET 请求示例。"""
+    # 方式 1: async with（推荐）
+    async with Net(retries=0) as net:
+        resp = await net.get("https://example.com")
+        print(f"状态码: {resp.status_code}")
+        print(f"内容类型: {resp.headers.get('Content-Type')}")
+
+    # 方式 2: 手动管理
+    net = Net(retries=0)
+    resp = await net.get("https://example.com")
+    print(f"原始字节长度: {len(resp.content)}")
+    await net.close()
+
+
+if __name__ == "__main__":
+    print("=== 同步示例 ===")
+    sync_example()
+
+    print("\n=== 异步示例 ===")
+    asyncio.run(async_example())

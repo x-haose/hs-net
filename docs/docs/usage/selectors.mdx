@@ -9,6 +9,16 @@ pip install hs-net[sp]
 
 hs-net 的 `Response` 对象内置四种数据提取方式，覆盖 HTML 和 JSON 两种场景。
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [CSS 选择器](#css-选择器) | CSS 语法提取 HTML | [`css_xpath.py`](https://github.com/x-haose/hs-net/blob/main/examples/parsing/css_xpath.py) |
+| [XPath](#xpath) | XPath 语法提取 HTML | [`css_xpath.py`](https://github.com/x-haose/hs-net/blob/main/examples/parsing/css_xpath.py) |
+| [正则表达式](#正则表达式) | 正则匹配提取 | [`css_xpath.py`](https://github.com/x-haose/hs-net/blob/main/examples/parsing/css_xpath.py) |
+| [JMESPath](#jmespathjson-查询) | JSON 数据查询 | [`jmespath_query.py`](https://github.com/x-haose/hs-net/blob/main/examples/parsing/jmespath_query.py) |
+| [URL 转换](#url-转换) | 相对 URL 转绝对 | — |
+
 ## CSS 选择器
 
 基于 [parsel](https://github.com/scrapy/parsel) 库，语法与浏览器开发者工具一致。
@@ -183,9 +193,9 @@ resp.to_url("/other")
 resp.to_url(["/a", "/b", "/c"])
 # => ["https://example.com/a", "https://example.com/b", "https://example.com/c"]
 
-# 已是绝对路径的会被过滤
+# 已是绝对路径的保持原样
 resp.to_url(["https://other.com/page", "/local"])
-# => ["https://example.com/local"]
+# => ["https://other.com/page", "https://example.com/local"]
 ```
 
 ### 配合选择器使用

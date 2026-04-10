@@ -1,5 +1,14 @@
 # 错误处理
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [异常层级](#异常层级) | 异常类继承关系 | [`error_handling.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/error_handling.py) |
+| [StatusException](#statusexception) | HTTP 状态码异常 | [`error_handling.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/error_handling.py) |
+| [RetryExhausted](#retryexhausted) | 重试耗尽异常 | [`error_handling.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/error_handling.py) |
+| [统一捕获](#统一捕获) | RequestException 基类 | [`error_handling.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/error_handling.py) |
+
 ## 异常层级
 
 hs-net 的所有异常都继承自 `RequestException`：

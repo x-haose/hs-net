@@ -50,6 +50,7 @@ class RequestsGoEngine(EngineBase):
         self.client.verify = self._verify
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
+        self._proxy = engine_options.get("proxy")
 
     async def close(self):
         """关闭 requests-go 客户端。"""
@@ -79,7 +80,10 @@ class RequestsGoEngine(EngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            response = await self.client.async_request(**build_common_request_kwargs(request_data))
+            kwargs = build_common_request_kwargs(request_data)
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
+            response = await self.client.async_request(**kwargs)
             return build_response(
                 url=str(response.url),
                 status_code=response.status_code,
@@ -89,10 +93,10 @@ class RequestsGoEngine(EngineBase):
                 content=response.content,
                 request_data=request_data,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     async def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 requests-go 执行异步流式 HTTP 请求。
@@ -111,6 +115,8 @@ class RequestsGoEngine(EngineBase):
         try:
             kwargs = build_common_request_kwargs(request_data)
             kwargs["stream"] = True
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
             response = await self.client.async_request(**kwargs)
 
             if not response.ok and request_data.raise_status:
@@ -127,10 +133,10 @@ class RequestsGoEngine(EngineBase):
                 stream=response.iter_content(chunk_size=8192),
                 close_callback=response.close,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
 
 class SyncRequestsGoEngine(SyncEngineBase):
@@ -162,6 +168,7 @@ class SyncRequestsGoEngine(SyncEngineBase):
         self.client.verify = self._verify
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
+        self._proxy = engine_options.get("proxy")
 
     def close(self):
         """关闭 requests-go 客户端。"""
@@ -191,7 +198,10 @@ class SyncRequestsGoEngine(SyncEngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            response = self.client.request(**build_common_request_kwargs(request_data))
+            kwargs = build_common_request_kwargs(request_data)
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
+            response = self.client.request(**kwargs)
             return build_response(
                 url=str(response.url),
                 status_code=response.status_code,
@@ -201,10 +211,10 @@ class SyncRequestsGoEngine(SyncEngineBase):
                 content=response.content,
                 request_data=request_data,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 requests-go 执行同步流式 HTTP 请求。
@@ -223,6 +233,8 @@ class SyncRequestsGoEngine(SyncEngineBase):
         try:
             kwargs = build_common_request_kwargs(request_data)
             kwargs["stream"] = True
+            if self._proxy:
+                kwargs["proxies"] = {"http": self._proxy, "https": self._proxy}
             response = self.client.request(**kwargs)
 
             if not response.ok and request_data.raise_status:
@@ -239,7 +251,7 @@ class SyncRequestsGoEngine(SyncEngineBase):
                 stream=response.iter_content(chunk_size=8192),
                 close_callback=response.close,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None

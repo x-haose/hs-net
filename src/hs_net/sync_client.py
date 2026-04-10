@@ -12,8 +12,10 @@ from hs_net._shared import format_retry_log, merge_config
 from hs_net.config import NetConfig
 from hs_net.engines.base import SyncEngineBase
 from hs_net.engines.httpx_engine import SyncHttpxEngine
-from hs_net.exceptions import RetryExhausted
+from hs_net.exceptions import RequestException, RetryExhausted
 from hs_net.models import EngineEnum, RequestModel
+from hs_net.proxy import ProxyService
+from hs_net.rate_limit import RateLimitConfig, SyncRateLimitManager
 from hs_net.response import Response
 from hs_net.response.stream import StreamResponse
 from hs_net.signals import SignalManager
@@ -69,6 +71,15 @@ def _resolve_sync_engine_cls(engine: str | EngineEnum | type[SyncEngineBase]) ->
     raise ValueError(f"不支持的同步引擎: {engine_value}")
 
 
+def _build_sync_rate_limiter(rate_limit) -> SyncRateLimitManager | None:
+    """根据 rate_limit 配置构建同步限速管理器。"""
+    if rate_limit is None:
+        return None
+    if isinstance(rate_limit, int | float):
+        rate_limit = RateLimitConfig(rate=int(rate_limit))
+    return SyncRateLimitManager(rate_limit)
+
+
 class SyncNet:
     """
     同步 HTTP 客户端
@@ -91,10 +102,11 @@ class SyncNet:
         retries: int = None,
         retry_delay: float = None,
         user_agent: str = None,
-        proxy: str = None,
+        proxy: str | ProxyService = None,
         verify: bool = None,
         raise_status: bool = None,
         allow_redirects: bool = None,
+        rate_limit: int | float | RateLimitConfig = None,
         concurrency: int = None,
         headers: dict[str, Any] = None,
         cookies: dict[str, Any] = None,
@@ -113,16 +125,33 @@ class SyncNet:
             retries: 请求失败后的重试次数。
             retry_delay: 重试间隔时间（秒）。
             user_agent: User-Agent，支持 "random"、"chrome" 等快捷方式。
-            proxy: 全局代理地址。
+            proxy: 代理配置，支持字符串、列表或 ProxyService。
             verify: 是否验证 SSL 证书。
             raise_status: 状态码非 2xx 时是否抛出异常。
             allow_redirects: 是否允许自动重定向。
+            rate_limit: 速率限制，支持 int/float（每秒请求数）或 RateLimitConfig。
             concurrency: 最大并发数，为 None 则不限制。
             headers: 全局默认请求头。
             cookies: 全局默认 cookies。
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
+        self._closed = False
+
+        # 所有代理统一走 ProxyService
+        self._proxy_service: ProxyService | None = None
+        self._owns_proxy_service: bool = False
+        proxy = proxy if proxy is not None else (config.proxy if config else None)
+        if isinstance(proxy, ProxyService):
+            self._proxy_service = proxy
+        elif isinstance(proxy, str):
+            self._proxy_service = ProxyService(proxy)
+            self._owns_proxy_service = True
+        if self._proxy_service:
+            if not self._proxy_service.started:
+                self._proxy_service.start()
+            proxy = None  # 代理由引擎 engine_options 注入
+
         self._config = merge_config(
             config,
             engine=engine,
@@ -135,6 +164,7 @@ class SyncNet:
             verify=verify,
             raise_status=raise_status,
             allow_redirects=allow_redirects,
+            rate_limit=rate_limit,
             concurrency=concurrency,
             headers=headers,
             cookies=cookies,
@@ -143,15 +173,18 @@ class SyncNet:
 
         sem = ThreadSemaphore(self._config.concurrency) if self._config.concurrency else None
         engine_cls = _resolve_sync_engine_cls(self._config.engine)
+        engine_options = dict(self._config.engine_options)
+        if self._proxy_service and self._proxy_service.started:
+            engine_options["proxy"] = self._proxy_service.local_url
         self._engine = engine_cls(
             sem=sem,
             headers=self._config.headers,
             cookies=self._config.cookies,
             verify=self._config.verify,
-            **self._config.engine_options,
+            **engine_options,
         )
 
-        self._closed = False
+        self._rate_limiter = _build_sync_rate_limiter(self._config.rate_limit)
 
         # 信号中间件
         self._signals = SignalManager()
@@ -168,18 +201,28 @@ class SyncNet:
         """
         return self._engine.cookies
 
+    @property
+    def proxy_service(self) -> ProxyService | None:
+        """获取代理服务实例。"""
+        return self._proxy_service
+
     def close(self):
-        """关闭客户端，释放底层引擎资源。"""
+        """关闭客户端，释放底层引擎和代理服务资源。"""
         if self._closed:
             return
         self._closed = True
         self._engine.close()
+        if self._owns_proxy_service and self._proxy_service and self._proxy_service.started:
+            self._proxy_service.stop()
 
     def __del__(self):
-        if not self._closed:
-            import warnings
+        try:
+            if not self._closed:
+                import warnings
 
-            warnings.warn(f"未关闭的 {self!r}，请使用 with 或手动调用 close()", ResourceWarning, stacklevel=2)
+                warnings.warn(f"未关闭的 {self!r}，请使用 with 或手动调用 close()", ResourceWarning, stacklevel=2)
+        except Exception:  # nosec B110
+            pass
 
     def __enter__(self):
         return self
@@ -210,7 +253,7 @@ class SyncNet:
         logger.warning(f"{log_msg} - 第 {attempt} 次重试")
 
     def _do_request(self, data: RequestModel) -> Response:
-        """执行单次请求，包含请求前/响应后信号中间件。
+        """执行单次请求，包含速率限制和请求前/响应后信号中间件。
 
         Args:
             data: 请求模型。
@@ -218,6 +261,10 @@ class SyncNet:
         Returns:
             Response 响应对象。
         """
+        # 速率限制
+        if self._rate_limiter:
+            self._rate_limiter.acquire(data.url)
+
         # 请求前信号
         for _receiver, result in self._signals.send_sync(self._signals.request_before, data):
             if isinstance(result, RequestModel):
@@ -225,10 +272,7 @@ class SyncNet:
             elif isinstance(result, Response):
                 return result
 
-        logger.debug(
-            f"[{data.method}] {data.url} proxy={data.proxy} "
-            f"params={data.url_params} json={data.json_data} form={data.form_data}"
-        )
+        logger.debug(f"[{data.method}] {data.url} params={data.url_params} json={data.json_data} form={data.form_data}")
 
         resp = self._engine.download(data)
 
@@ -252,7 +296,6 @@ class SyncNet:
         headers: dict = None,
         cookies: dict = None,
         timeout: float = None,
-        proxy: str = None,
         verify: bool = None,
         retries: int = None,
         retry_delay: float = None,
@@ -274,7 +317,6 @@ class SyncNet:
             headers: 请求头。
             cookies: cookies。
             timeout: 超时时间（秒）。
-            proxy: 代理地址。
             verify: 是否验证 SSL 证书。
             retries: 重试次数。
             retry_delay: 重试间隔（秒）。
@@ -300,7 +342,6 @@ class SyncNet:
             headers=headers,
             cookies=cookies,
             timeout=timeout,
-            proxy=proxy,
             verify=verify,
             retries=retries,
             retry_delay=retry_delay,
@@ -308,17 +349,20 @@ class SyncNet:
             allow_redirects=allow_redirects,
         )
 
-        if not data.retries or data.retries < 1:
-            return self._do_request(data)
+        try:
+            if not data.retries or data.retries < 1:
+                return self._do_request(data)
 
-        wait = wait_fixed(data.retry_delay) + wait_random(0.1, 1) if data.retry_delay else wait_fixed(0)
-        retry = Retrying(
-            stop=stop_after_attempt(data.retries),
-            after=functools.partial(self._retry_handler, data),
-            retry_error_callback=functools.partial(self._retry_handler, data),
-            wait=wait,
-        )
-        return retry.wraps(functools.partial(self._do_request, data))()
+            wait = wait_fixed(data.retry_delay) + wait_random(0.1, 1) if data.retry_delay else wait_fixed(0)
+            retry = Retrying(
+                stop=stop_after_attempt(data.retries),
+                after=functools.partial(self._retry_handler, data),
+                retry_error_callback=functools.partial(self._retry_handler, data),
+                wait=wait,
+            )
+            return retry.wraps(functools.partial(self._do_request, data))()
+        except RequestException as e:
+            raise e.with_traceback(None) from None
 
     def stream(
         self,
@@ -333,7 +377,6 @@ class SyncNet:
         headers: dict = None,
         cookies: dict = None,
         timeout: float = None,
-        proxy: str = None,
         verify: bool = None,
         raise_status: bool = None,
         allow_redirects: bool = None,
@@ -358,7 +401,6 @@ class SyncNet:
             headers: 请求头。
             cookies: cookies。
             timeout: 超时时间（秒）。
-            proxy: 代理地址。
             verify: 是否验证 SSL 证书。
             raise_status: 是否抛出状态码异常。
             allow_redirects: 是否允许重定向。
@@ -378,12 +420,14 @@ class SyncNet:
             headers=headers,
             cookies=cookies,
             timeout=timeout,
-            proxy=proxy,
             verify=verify,
             raise_status=raise_status,
             allow_redirects=allow_redirects,
         )
-        return self._engine.stream(data)
+        try:
+            return self._engine.stream(data)
+        except RequestException as e:
+            raise e.with_traceback(None) from None
 
     def get(self, url: str, *, params: dict = None, **kwargs) -> Response:
         """发起 GET 请求。

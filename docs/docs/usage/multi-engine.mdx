@@ -2,6 +2,15 @@
 
 hs-net 支持 5 种 HTTP 引擎，切换只需改一个参数。
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [引擎一览](#引擎一览) | 5 种引擎对比 | [`multi_engine.py`](https://github.com/x-haose/hs-net/blob/main/examples/engine/multi_engine.py) |
+| [切换引擎](#切换引擎) | 字符串/枚举指定引擎 | [`multi_engine.py`](https://github.com/x-haose/hs-net/blob/main/examples/engine/multi_engine.py) |
+| [引擎特定配置](#引擎特定配置) | engine_options 透传 | [`multi_engine.py`](https://github.com/x-haose/hs-net/blob/main/examples/engine/multi_engine.py) |
+| [自定义引擎](#自定义引擎) | 继承 EngineBase | — |
+
 ## 引擎一览
 
 | 引擎 | 异步 | 同步 | HTTP/2 | TLS 指纹 | SOCKS 代理 | 安装方式 | 适用场景 |

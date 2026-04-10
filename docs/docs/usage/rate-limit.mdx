@@ -1,0 +1,125 @@
+# 速率限制
+
+hs-net 内置基于令牌桶的速率限制，支持全局限速和按域名独立限速。
+
+:::tip 可选依赖
+速率限制功能需要额外安装：
+```bash
+pip install hs-net[sp]
+```
+:::
+
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [简单限速](#简单限速) | int/float 快捷配置 | [`rate_limit.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py) |
+| [RateLimitConfig](#ratelimitconfig) | 详细限速配置 | [`rate_limit.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py) |
+| [按域名限速](#按域名限速) | 不同域名不同速率 | [`rate_limit.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py) |
+| [与并发控制的区别](#与并发控制的区别) | 限速 vs 并发 | — |
+
+## 简单限速
+
+传入数字即表示每秒最多多少个请求：
+
+```python title="simple_rate.py"
+from hs_net import Net, SyncNet
+
+# 异步：每秒最多 5 个请求
+async with Net(rate_limit=5) as net:
+    # 超过限制时会自动等待
+    tasks = [net.get(f"https://api.example.com/item/{i}") for i in range(100)]
+    results = await asyncio.gather(*tasks)
+
+# 同步
+with SyncNet(rate_limit=5) as net:
+    for i in range(100):
+        resp = net.get(f"https://api.example.com/item/{i}")
+```
+
+## RateLimitConfig
+
+使用 `RateLimitConfig` 进行更精细的配置：
+
+```python title="config_rate.py"
+from hs_net import Net, RateLimitConfig
+
+config = RateLimitConfig(
+    rate=10,          # 每个时间窗口允许的请求数
+    duration=1000,    # 时间窗口（毫秒），默认 1000 = 1 秒
+)
+
+async with Net(rate_limit=config) as net:
+    resp = await net.get("https://example.com")
+```
+
+### 自定义时间窗口
+
+```python title="custom_window.py"
+# 每分钟最多 60 个请求
+config = RateLimitConfig(rate=60, duration=60_000)
+
+# 每 10 秒最多 5 个请求
+config = RateLimitConfig(rate=5, duration=10_000)
+```
+
+## 按域名限速
+
+不同域名可以设置不同的速率限制：
+
+```python title="per_domain.py"
+from hs_net import Net, RateLimitConfig
+
+config = RateLimitConfig(
+    rate=10,  # 全局每秒 10 个
+    per_domain={
+        "api.example.com": 2,           # 这个域名每秒最多 2 个
+        "slow.example.com": RateLimitConfig(rate=1, duration=2000),  # 每 2 秒 1 个
+    },
+)
+
+async with Net(rate_limit=config) as net:
+    # 这个请求受 api.example.com 的限制（每秒 2 个）
+    await net.get("https://api.example.com/data")
+
+    # 这个请求受全局限制（每秒 10 个）
+    await net.get("https://other.example.com/data")
+```
+
+:::info 优先级
+请求 URL 的域名如果命中 `per_domain` 中的配置，则**只使用**域名级限速器，不会同时受全局限速。
+未命中时使用全局限速器。
+:::
+
+## 与 NetConfig 配合
+
+```python title="with_config.py"
+from hs_net import Net, NetConfig, RateLimitConfig
+
+config = NetConfig(
+    rate_limit=RateLimitConfig(
+        rate=10,
+        per_domain={"api.example.com": 2},
+    ),
+    retries=3,
+)
+
+async with Net(config=config) as net:
+    resp = await net.get("https://api.example.com/data")
+```
+
+## 与并发控制的区别
+
+| | `rate_limit` | `concurrency` |
+|---|---|---|
+| 控制目标 | 请求频率（每秒多少个） | 同时进行的请求数 |
+| 机制 | 令牌桶，超限时等待 | 信号量，超限时排队 |
+| 适用场景 | API 限流、防封禁 | 控制资源消耗 |
+| 可组合 | ✅ 两者可同时使用 | ✅ 两者可同时使用 |
+
+```python title="combined.py"
+# 最多同时 10 个请求，且每秒不超过 5 个
+async with Net(concurrency=10, rate_limit=5) as net:
+    tasks = [net.get(url) for url in urls]
+    results = await asyncio.gather(*tasks)
+```

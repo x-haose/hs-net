@@ -1,0 +1,26 @@
+"""
+重试中间件 (on_request_retry)
+
+在请求重试时执行，可用于记录重试原因、调整策略等。
+"""
+
+from hs_net import SyncNet
+
+
+def main():
+    """记录每次重试的异常信息。"""
+    with SyncNet(retries=3, raise_status=True) as net:
+
+        @net.on_request_retry
+        def on_retry(exc):
+            print(f"  ~ 重试中，原因: {type(exc).__name__}: {exc}")
+
+        try:
+            # 访问一个会返回 404 的 URL，触发重试
+            net.get("https://example.com/nonexistent-12345")
+        except Exception as e:
+            print(f"  x 最终失败: {type(e).__name__}")
+
+
+if __name__ == "__main__":
+    main()

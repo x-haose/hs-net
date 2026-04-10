@@ -21,8 +21,6 @@ class Response:
         cookies: 本次响应返回的 cookies。
         client_cookies: 客户端会话级别的 cookies。
         content: 响应体的原始字节。
-        text: 响应体的文本内容（懒加载）。
-        json_data: 响应体解析后的 JSON 数据，解析失败为 None（懒加载）。
         request_data: 本次请求的 RequestModel。
         domain: 响应 URL 的域名（含协议）。
         host: 响应 URL 的主机名。

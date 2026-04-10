@@ -1,5 +1,5 @@
 """
-示例 8: 快捷函数
+快捷函数
 
 无需实例化 Net / SyncNet，通过模块级函数直接发起请求。
 每次调用会创建临时客户端，适合简单的一次性请求场景。
@@ -18,13 +18,14 @@ def sync_examples():
     """同步快捷函数示例。"""
 
     # GET 请求
-    resp = hs_net.sync_get("https://example.com")
+    resp = hs_net.sync_get("https://example.com", retries=0)
     print(f"GET: {resp.status_code} - {resp.css('title::text').get()}")
 
     # POST 请求
     resp = hs_net.sync_post(
         "https://httpbin.org/post",
         json_data={"name": "hs-net", "version": "0.2.0"},
+        retries=0,
     )
     print(f"POST: {resp.jmespath('json.name')}")
 
@@ -34,11 +35,12 @@ def sync_examples():
         params={"q": "python", "page": "1"},
         headers={"Accept": "application/json"},
         timeout=10.0,
+        retries=0,
     )
     print(f"带参数: {resp.jmespath('args')}")
 
     # 通用 request 方法
-    resp = hs_net.sync_request("PUT", "https://httpbin.org/put", json_data={"updated": True})
+    resp = hs_net.sync_request("PUT", "https://httpbin.org/put", json_data={"updated": True}, retries=0)
     print(f"PUT: {resp.status_code}")
 
 
@@ -49,19 +51,20 @@ async def async_examples():
     """异步快捷函数示例。"""
 
     # GET 请求
-    resp = await hs_net.get("https://example.com")
+    resp = await hs_net.get("https://example.com", retries=0)
     print(f"GET: {resp.status_code} - {resp.css('title::text').get()}")
 
     # POST 请求
     resp = await hs_net.post(
         "https://httpbin.org/post",
         json_data={"name": "hs-net", "version": "0.2.0"},
+        retries=0,
     )
     print(f"POST: {resp.jmespath('json.name')}")
 
     # 并发请求（注意：每次调用都创建新客户端，高并发场景建议用 Net）
     urls = [f"https://example.com/?id={i}" for i in range(5)]
-    tasks = [hs_net.get(url) for url in urls]
+    tasks = [hs_net.get(url, retries=0) for url in urls]
     results = await asyncio.gather(*tasks)
     print(f"并发: {len(results)} 个请求, 全部成功: {all(r.ok for r in results)}")
 
@@ -77,18 +80,18 @@ def engine_examples():
         pip install hs-net[requests]     # requests
         pip install hs-net[requests-go]  # requests-go
     """
-    from hs_net import EngineNotInstalled
+    from hs_net import EngineEnum, EngineNotInstalled
 
     # 使用 requests 引擎
     try:
-        resp = hs_net.sync_get("https://example.com", engine="requests")
+        resp = hs_net.sync_get("https://example.com", engine=EngineEnum.REQUESTS, retries=0)
         print(f"requests 引擎: {resp.status_code}")
     except EngineNotInstalled as e:
         print(f"引擎未安装: pip install {e.install_package}")
 
     # 使用 curl_cffi 引擎
     try:
-        resp = hs_net.sync_get("https://example.com", engine="curl_cffi")
+        resp = hs_net.sync_get("https://example.com", engine=EngineEnum.CURL_CFFI, retries=0)
         print(f"curl_cffi 引擎: {resp.status_code}")
     except EngineNotInstalled as e:
         print(f"引擎未安装: pip install {e.install_package}")

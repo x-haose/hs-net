@@ -17,7 +17,7 @@ from hs_net.models import RequestModel
 from hs_net.response import Response
 from hs_net.response.stream import StreamResponse
 
-from .base import SyncEngineBase, build_proxies_dict, build_response
+from .base import SyncEngineBase, build_response
 
 
 class SyncRequestsEngine(SyncEngineBase):
@@ -47,8 +47,14 @@ class SyncRequestsEngine(SyncEngineBase):
 
         self.client = Session()
         self.client.verify = self._verify
+
+        if not self._verify:
+            import urllib3
+
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.client.headers.update(self._default_headers)
         self.client.cookies = cookiejar_from_dict(self._default_cookies)
+        self._proxy = engine_options.get("proxy")
 
     def close(self):
         """关闭 requests 会话。"""
@@ -87,7 +93,7 @@ class SyncRequestsEngine(SyncEngineBase):
                 files=request_data.files,
                 cookies=request_data.cookies,
                 headers=request_data.headers,
-                proxies=build_proxies_dict(request_data.proxy),
+                proxies={"http": self._proxy, "https": self._proxy} if self._proxy else None,
                 timeout=request_data.timeout,
                 allow_redirects=request_data.allow_redirects,
             )
@@ -101,10 +107,10 @@ class SyncRequestsEngine(SyncEngineBase):
                 content=response.content,
                 request_data=request_data,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 requests 执行同步流式 HTTP 请求。
@@ -130,7 +136,6 @@ class SyncRequestsEngine(SyncEngineBase):
                 files=request_data.files,
                 cookies=request_data.cookies,
                 headers=request_data.headers,
-                proxies=build_proxies_dict(request_data.proxy),
                 timeout=request_data.timeout,
                 allow_redirects=request_data.allow_redirects,
                 stream=True,
@@ -150,7 +155,7 @@ class SyncRequestsEngine(SyncEngineBase):
                 stream=response.iter_content(chunk_size=8192),
                 close_callback=response.close,
             )
-        except requests.Timeout as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except requests.Timeout:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except requests.ConnectionError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None

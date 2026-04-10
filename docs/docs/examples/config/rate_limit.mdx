@@ -1,0 +1,73 @@
+# 速率限制
+
+> 源码: [https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py](https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py)
+
+```python title="rate_limit.py"
+"""
+速率限制
+
+控制每秒发送的请求数量，支持全局限速和按域名独立限速。
+"""
+
+import asyncio
+
+from hs_net import Net, RateLimitConfig, SyncNet
+
+# ==================== 基础限速 ====================
+
+
+def basic():
+    """全局每秒 N 个请求。"""
+    # 最简写法：每秒最多 3 个请求
+    with SyncNet(rate_limit=3, retries=0) as net:
+        for i in range(5):
+            resp = net.get("https://example.com")
+            print(f"  请求 {i + 1}: {resp.status_code}")
+
+
+# ==================== 按域名限速 ====================
+
+
+def per_domain():
+    """不同域名使用不同的限速策略，互相独立。"""
+    with SyncNet(
+        rate_limit=RateLimitConfig(
+            rate=10,  # 全局默认：10 次/秒
+            per_domain={
+                "example.com": 2,  # example.com：2 次/秒
+                "httpbin.org": RateLimitConfig(rate=1, duration=2000),  # httpbin：2 秒 1 次
+            },
+        ),
+        retries=0,
+    ) as net:
+        for i in range(3):
+            resp = net.get("https://example.com")
+            print(f"  example.com 请求 {i + 1}: {resp.status_code}")
+
+
+# ==================== 异步限速 + 并发控制 ====================
+
+
+async def async_with_concurrency():
+    """rate_limit 控制"每秒发多少个"，concurrency 控制"同时在跑多少个"。"""
+    async with Net(
+        rate_limit=5,  # 每秒最多 5 个请求
+        concurrency=3,  # 同时最多 3 个在跑
+        retries=0,
+    ) as net:
+        urls = [f"https://example.com/?page={i}" for i in range(10)]
+        tasks = [net.get(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        print(f"  完成 {len(results)} 个请求，全部成功: {all(r.ok for r in results)}")
+
+
+if __name__ == "__main__":
+    print("=== 基础限速 ===")
+    basic()
+
+    print("\n=== 按域名限速 ===")
+    per_domain()
+
+    print("\n=== 异步限速 + 并发控制 ===")
+    asyncio.run(async_with_concurrency())
+```

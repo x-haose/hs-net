@@ -46,12 +46,14 @@ class CurlCffiEngine(EngineBase):
 
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        proxy = engine_options.get("proxy")
         self.client = AsyncSession(
             verify=self._verify,
             headers=self._default_headers,
             cookies=self._default_cookies,
             impersonate=engine_options.get("impersonate", "chrome110"),
             http_version=engine_options.get("http_version", CurlHttpVersion.V2_0),
+            proxy=proxy,
         )
 
     async def close(self):
@@ -95,8 +97,8 @@ class CurlCffiEngine(EngineBase):
         except curl_cffi.requests.errors.RequestsError as e:
             err_msg = str(e).lower()
             if "timeout" in err_msg:
-                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     async def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 curl-cffi 执行异步流式 HTTP 请求。
@@ -133,8 +135,8 @@ class CurlCffiEngine(EngineBase):
         except curl_cffi.requests.errors.RequestsError as e:
             err_msg = str(e).lower()
             if "timeout" in err_msg:
-                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
 
 class SyncCurlCffiEngine(SyncEngineBase):
@@ -162,12 +164,14 @@ class SyncCurlCffiEngine(SyncEngineBase):
 
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        proxy = engine_options.get("proxy")
         self.client = Session(
             verify=self._verify,
             headers=self._default_headers,
             cookies=self._default_cookies,
             impersonate=engine_options.get("impersonate", "chrome110"),
             http_version=engine_options.get("http_version", CurlHttpVersion.V2_0),
+            proxy=proxy,
         )
 
     def close(self):
@@ -211,8 +215,8 @@ class SyncCurlCffiEngine(SyncEngineBase):
         except curl_cffi.requests.errors.RequestsError as e:
             err_msg = str(e).lower()
             if "timeout" in err_msg:
-                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 curl-cffi 执行同步流式 HTTP 请求。
@@ -249,5 +253,5 @@ class SyncCurlCffiEngine(SyncEngineBase):
         except curl_cffi.requests.errors.RequestsError as e:
             err_msg = str(e).lower()
             if "timeout" in err_msg:
-                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+                raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
+            raise ConnectionException(url=request_data.url, message=str(e)) from None

@@ -21,6 +21,7 @@ def merge_config(
     verify=None,
     raise_status=None,
     allow_redirects=None,
+    rate_limit=None,
     concurrency=None,
     headers: dict[str, Any] | None = None,
     cookies: dict[str, Any] | None = None,
@@ -39,6 +40,7 @@ def merge_config(
         verify=verify if verify is not None else cfg.verify,
         raise_status=raise_status if raise_status is not None else cfg.raise_status,
         allow_redirects=allow_redirects if allow_redirects is not None else cfg.allow_redirects,
+        rate_limit=rate_limit if rate_limit is not None else cfg.rate_limit,
         concurrency=concurrency if concurrency is not None else cfg.concurrency,
         headers={**cfg.headers, **(headers or {})},
         cookies={**cfg.cookies, **(cookies or {})},
@@ -61,5 +63,5 @@ def format_retry_log(req_data, retry_state: RetryCallState) -> tuple[str, int, E
     if isinstance(exception, StatusException):
         exc_msg = f"HTTP {exception.code}"
 
-    log_msg = f"[{req_data.method}] {req_data.url} proxy={req_data.proxy} error=[{exc_type}]: {exc_msg}"
+    log_msg = f"[{req_data.method}] {req_data.url} error=[{exc_type}]: {exc_msg}"
     return log_msg, attempt, exception

@@ -16,10 +16,11 @@ config = NetConfig(
     retries=3,                  # 重试次数
     retry_delay=0.0,            # 重试间隔（秒）
     user_agent="random",        # User-Agent
-    proxy=None,                 # 代理地址
-    verify=True,                # SSL 证书验证
+    proxy=None,                 # 代理地址（支持字符串或 ProxyService）
+    verify=False,               # SSL 证书验证（默认关闭）
     raise_status=True,          # 非 2xx 是否抛异常
     allow_redirects=True,       # 是否跟随重定向
+    rate_limit=None,            # 速率限制（int/float 或 RateLimitConfig）
     concurrency=None,           # 最大并发数
     headers={},                 # 全局请求头
     cookies={},                 # 全局 cookies
@@ -74,11 +75,39 @@ net = SyncNet(user_agent="MyBot/1.0") # 自定义 UA
 
 ### verify
 
-是否验证 SSL 证书：
+是否验证 SSL 证书（默认关闭）：
 
 ```python
-net = SyncNet(verify=False)  # 跳过 SSL 验证（开发/测试环境）
+net = SyncNet(verify=True)   # 开启 SSL 验证（生产环境推荐）
+net = SyncNet(verify=False)  # 跳过 SSL 验证（默认）
 ```
+
+### rate_limit
+
+速率限制，控制请求频率：
+
+```python
+from hs_net import RateLimitConfig
+
+# 简单全局限速：每秒最多 5 个请求
+net = SyncNet(rate_limit=5)
+
+# 精细配置
+net = SyncNet(rate_limit=RateLimitConfig(
+    rate=10,                            # 全局每秒 10 个
+    per_domain={
+        "api.example.com": 2,           # 特定域名每秒 2 个
+        "slow.example.com": RateLimitConfig(rate=1),
+    },
+))
+```
+
+:::tip 可选依赖
+速率限制功能需要额外安装：
+```bash
+pip install hs-net[sp]
+```
+:::
 
 ### concurrency
 

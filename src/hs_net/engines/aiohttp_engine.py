@@ -44,6 +44,7 @@ class AiohttpEngine(EngineBase):
 
         super().__init__(sem, headers, cookies, verify, **engine_options)
 
+        self._proxy = engine_options.get("proxy")
         self.client = ClientSession(
             headers=self._default_headers,
             cookies=self._default_cookies,
@@ -88,7 +89,7 @@ class AiohttpEngine(EngineBase):
                 json=request_data.json_data,
                 cookies=request_data.cookies,
                 headers=request_data.headers,
-                proxy=request_data.proxy,
+                proxy=self._proxy,
                 timeout=timeout,
                 allow_redirects=request_data.allow_redirects,
             )
@@ -105,10 +106,10 @@ class AiohttpEngine(EngineBase):
                 content=resp_content,
                 request_data=request_data,
             )
-        except TimeoutError as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except TimeoutError:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except aiohttp.ClientConnectorError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None
 
     async def _stream(self, request_data: RequestModel) -> StreamResponse:
         """使用 aiohttp 执行异步流式 HTTP 请求。
@@ -134,7 +135,7 @@ class AiohttpEngine(EngineBase):
                 json=request_data.json_data,
                 cookies=request_data.cookies,
                 headers=request_data.headers,
-                proxy=request_data.proxy,
+                proxy=self._proxy,
                 timeout=timeout,
                 allow_redirects=request_data.allow_redirects,
             )
@@ -153,7 +154,7 @@ class AiohttpEngine(EngineBase):
                 stream=response.content.iter_any(),
                 close_callback=response.release,
             )
-        except TimeoutError as e:
-            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from e
+        except TimeoutError:
+            raise TimeoutException(url=request_data.url, timeout=request_data.timeout) from None
         except aiohttp.ClientConnectorError as e:
-            raise ConnectionException(url=request_data.url, message=str(e)) from e
+            raise ConnectionException(url=request_data.url, message=str(e)) from None

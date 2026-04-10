@@ -23,7 +23,6 @@ def build_request(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -44,7 +43,6 @@ def build_request(
         headers: 请求头，与实例配置合并。
         cookies: cookies，与实例配置合并。
         timeout: 超时时间（秒），覆盖实例配置。
-        proxy: 代理地址，覆盖实例配置。
         verify: 是否验证 SSL 证书，覆盖实例配置。
         retries: 重试次数，覆盖实例配置。
         retry_delay: 重试间隔（秒），覆盖实例配置。
@@ -81,7 +79,6 @@ def build_request(
         headers=req_headers,
         cookies={**cfg.cookies, **(cookies or {})},
         timeout=timeout if timeout is not None else cfg.timeout,
-        proxy=proxy if proxy is not None else cfg.proxy,
         verify=verify if verify is not None else cfg.verify,
         retries=retries if retries is not None else cfg.retries,
         retry_delay=retry_delay if retry_delay is not None else cfg.retry_delay,

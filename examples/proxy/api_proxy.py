@@ -1,0 +1,106 @@
+"""
+代理池 API
+
+通过 ApiProxyProvider 对接代理池 API，自动获取代理地址。
+通过 Clash 中转连接海外代理。
+
+链路: 引擎 -> ProxyService(本地代理) -> Clash(中转) -> 代理池网关(认证) -> 目标站
+
+运行前请确保:
+    1. 本地 Clash 已启动（用于中转连接海外代理）
+    2. 替换 API_URL 为你的代理池 API 地址
+    3. 替换 PROXY_USER / PROXY_PASS 为你的认证账户
+
+同步 + 异步双模式演示，循环验证所有引擎均支持。
+"""
+
+import asyncio
+
+from httpx import Response as HttpxResponse
+
+from hs_net import ApiProxyProvider, EngineEnum, Net, ProxyService, SyncNet
+
+# 代理池 API 地址
+API_URL = "https://..."
+
+# 代理认证账户
+PROXY_USER = ""
+PROXY_PASS = ""  # nosec B105
+
+# 本地 Clash 代理地址，用作中转（海外代理不接受国内直连）
+CLASH_PROXY = "http://127.0.0.1:7897"
+
+TEST_URL = "http://ip-api.com/json/"
+
+SYNC_ENGINES = [
+    EngineEnum.HTTPX,
+    EngineEnum.REQUESTS,
+    EngineEnum.CURL_CFFI,
+    EngineEnum.REQUESTS_GO,
+]
+
+ASYNC_ENGINES = [
+    EngineEnum.HTTPX,
+    EngineEnum.AIOHTTP,
+    EngineEnum.CURL_CFFI,
+    EngineEnum.REQUESTS_GO,
+]
+
+
+def parse_proxy(resp: HttpxResponse) -> str:
+    """从代理池 API 响应中提取代理地址。
+
+    响应格式::
+
+        {"code": 0, "success": true, "data": [{"ip": "1.2.3.4", "port": 8080}]}
+
+    Returns:
+        带认证的代理地址，如 ``"https://user:pass@1.2.3.4:8080"``。
+
+    Raises:
+        RuntimeError: API 返回错误（如白名单未配置）。
+    """
+    data = resp.json()
+    if not data.get("success"):
+        raise RuntimeError(f"代理池 API 错误: {data.get('msg', '未知错误')}")
+    item = data["data"][0]
+    return f"https://{PROXY_USER}:{PROXY_PASS}@{item['ip']}:{item['port']}"
+
+
+def sync_demo():
+    """同步模式演示。"""
+    print("=== 同步模式 ===")
+
+    provider = ApiProxyProvider(API_URL, parser=parse_proxy)
+    svc = ProxyService(provider=provider, transit=CLASH_PROXY)
+
+    for engine in SYNC_ENGINES:
+        with SyncNet(proxy=svc, engine=engine, retries=0, timeout=5) as net:
+            resp = net.get(TEST_URL)
+            ip = resp.json_data["query"]
+            print(f"{engine.value:12s} -> IP: {ip}")
+
+        # 每个引擎换一个新代理
+        svc.switch()
+
+
+async def async_demo():
+    """异步模式演示。"""
+    print("\n=== 异步模式 ===")
+
+    provider = ApiProxyProvider(API_URL, parser=parse_proxy)
+    svc = ProxyService(provider=provider, transit=CLASH_PROXY)
+
+    for engine in ASYNC_ENGINES:
+        async with Net(proxy=svc, engine=engine, retries=0, timeout=5) as net:
+            resp = await net.get(TEST_URL)
+            ip = resp.json_data["query"]
+            print(f"{engine.value:12s} -> IP: {ip}")
+
+        # 每个引擎换一个新代理（异步版本）
+        await svc.async_switch()
+
+
+if __name__ == "__main__":
+    sync_demo()
+    asyncio.run(async_demo())

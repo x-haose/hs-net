@@ -35,11 +35,6 @@ def build_response(
     )
 
 
-def build_proxies_dict(proxy: str | None) -> dict[str, str] | None:
-    """构建代理字典。"""
-    return {"https": proxy, "http": proxy} if proxy else None
-
-
 def build_common_request_kwargs(request_data: RequestModel) -> dict:
     """构建 curl-cffi / requests / requests-go 共用的请求参数。"""
     return {
@@ -51,7 +46,6 @@ def build_common_request_kwargs(request_data: RequestModel) -> dict:
         "files": request_data.files,
         "cookies": request_data.cookies,
         "headers": request_data.headers,
-        "proxies": build_proxies_dict(request_data.proxy),
         "timeout": request_data.timeout,
         "allow_redirects": request_data.allow_redirects,
     }

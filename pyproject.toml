@@ -1,6 +1,6 @@
 [project]
 name = "hs-net"
-version = "0.2.0"
+version = "0.3.0"
 description = "统一多引擎的增强型 HTTP 客户端，内置重试、选择器、信号中间件"
 readme = "README.md"
 license = "MIT"
@@ -25,7 +25,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sp = ["parsel>=1.9", "jmespath>=1.1.0", "fake-useragent>=1.5"]
+sp = [
+    "parsel>=1.9",
+ "jmespath>=1.1.0",
+ "fake-useragent>=1.5",
+ "pyrate-limiter>=3.0",
+]
 aiohttp = ["aiohttp>=3.9"]
 curl = ["curl-cffi>=0.7"]
 requests = ["requests>=2.31"]
@@ -60,6 +65,10 @@ ignore = ["B008", "C901"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::PendingDeprecationWarning:jmespath",
+    "ignore::urllib3.exceptions.InsecureRequestWarning",
+]
 
 [tool.bandit]
 exclude_dirs = ["tests"]

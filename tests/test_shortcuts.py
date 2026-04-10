@@ -32,10 +32,34 @@ from hs_net.shortcuts import (
 )
 
 # ---------------------------------------------------------------------------
-# 辅助：构建 mock 客户端
+# 辅助：构建 mock 客户端和默认参数
 # ---------------------------------------------------------------------------
 
 FAKE_URL = "https://example.com/api"
+
+# 所有快捷函数最终经过 request() 传递的完整参数
+_DEFAULTS = {
+    "params": None,
+    "json_data": None,
+    "form_data": None,
+    "files": None,
+    "user_agent": None,
+    "headers": None,
+    "cookies": None,
+    "timeout": None,
+    "verify": None,
+    "retries": None,
+    "retry_delay": None,
+    "raise_status": None,
+    "allow_redirects": None,
+}
+
+
+def _expected(method: str, url: str, **overrides):
+    """构建 mock.assert_called_once_with 的期望参数。"""
+    defaults = dict(_DEFAULTS)
+    defaults.update(overrides)
+    return (method, url), defaults
 
 
 def _make_mock_net():
@@ -72,7 +96,8 @@ class TestAsyncRequest:
             resp = await request("GET", FAKE_URL)
 
         mock_cls.assert_called_once_with()
-        client.request.assert_awaited_once_with("GET", FAKE_URL)
+        args, kwargs = _expected("GET", FAKE_URL)
+        client.request.assert_awaited_once_with(*args, **kwargs)
         client.close.assert_awaited_once()
         assert resp is mock_resp
 
@@ -83,7 +108,8 @@ class TestAsyncRequest:
         with patch("hs_net.shortcuts.Net", return_value=client):
             await request("POST", FAKE_URL, json_data={"k": "v"}, timeout=5)
 
-        client.request.assert_awaited_once_with("POST", FAKE_URL, json_data={"k": "v"}, timeout=5)
+        args, kwargs = _expected("POST", FAKE_URL, json_data={"k": "v"}, timeout=5)
+        client.request.assert_awaited_once_with(*args, **kwargs)
 
     @pytest.mark.asyncio
     async def test_request_with_engine(self):
@@ -115,7 +141,8 @@ class TestAsyncGet:
         with patch("hs_net.shortcuts.Net", return_value=client):
             resp = await get(FAKE_URL, params={"q": "test"})
 
-        client.request.assert_awaited_once_with("GET", FAKE_URL, params={"q": "test"})
+        args, kwargs = _expected("GET", FAKE_URL, params={"q": "test"})
+        client.request.assert_awaited_once_with(*args, **kwargs)
         assert resp is mock_resp
 
 
@@ -134,13 +161,14 @@ class TestAsyncPost:
                 files={"f": b"data"},
             )
 
-        client.request.assert_awaited_once_with(
+        args, kwargs = _expected(
             "POST",
             FAKE_URL,
             json_data={"a": 1},
             form_data={"b": "2"},
             files={"f": b"data"},
         )
+        client.request.assert_awaited_once_with(*args, **kwargs)
 
 
 class TestAsyncPut:
@@ -152,7 +180,8 @@ class TestAsyncPut:
         with patch("hs_net.shortcuts.Net", return_value=client):
             await put(FAKE_URL, json_data={"x": 1})
 
-        client.request.assert_awaited_once_with("PUT", FAKE_URL, json_data={"x": 1})
+        args, kwargs = _expected("PUT", FAKE_URL, json_data={"x": 1})
+        client.request.assert_awaited_once_with(*args, **kwargs)
 
 
 class TestAsyncPatch:
@@ -164,7 +193,8 @@ class TestAsyncPatch:
         with patch("hs_net.shortcuts.Net", return_value=client):
             await http_patch(FAKE_URL, json_data={"x": 2})
 
-        client.request.assert_awaited_once_with("PATCH", FAKE_URL, json_data={"x": 2})
+        args, kwargs = _expected("PATCH", FAKE_URL, json_data={"x": 2})
+        client.request.assert_awaited_once_with(*args, **kwargs)
 
 
 class TestAsyncDelete:
@@ -176,7 +206,8 @@ class TestAsyncDelete:
         with patch("hs_net.shortcuts.Net", return_value=client):
             await delete(FAKE_URL)
 
-        client.request.assert_awaited_once_with("DELETE", FAKE_URL)
+        args, kwargs = _expected("DELETE", FAKE_URL)
+        client.request.assert_awaited_once_with(*args, **kwargs)
 
 
 class TestAsyncHead:
@@ -188,7 +219,8 @@ class TestAsyncHead:
         with patch("hs_net.shortcuts.Net", return_value=client):
             await head(FAKE_URL, params={"p": "1"})
 
-        client.request.assert_awaited_once_with("HEAD", FAKE_URL, params={"p": "1"})
+        args, kwargs = _expected("HEAD", FAKE_URL, params={"p": "1"})
+        client.request.assert_awaited_once_with(*args, **kwargs)
 
 
 class TestAsyncOptions:
@@ -200,7 +232,8 @@ class TestAsyncOptions:
         with patch("hs_net.shortcuts.Net", return_value=client):
             await options(FAKE_URL)
 
-        client.request.assert_awaited_once_with("OPTIONS", FAKE_URL)
+        args, kwargs = _expected("OPTIONS", FAKE_URL)
+        client.request.assert_awaited_once_with(*args, **kwargs)
 
 
 # ===========================================================================
@@ -218,7 +251,8 @@ class TestSyncRequest:
             resp = sync_request("GET", FAKE_URL)
 
         mock_cls.assert_called_once_with()
-        client.request.assert_called_once_with("GET", FAKE_URL)
+        args, kwargs = _expected("GET", FAKE_URL)
+        client.request.assert_called_once_with(*args, **kwargs)
         client.close.assert_called_once()
         assert resp is mock_resp
 
@@ -228,7 +262,8 @@ class TestSyncRequest:
         with patch("hs_net.shortcuts.SyncNet", return_value=client):
             sync_request("POST", FAKE_URL, json_data={"k": "v"}, timeout=5)
 
-        client.request.assert_called_once_with("POST", FAKE_URL, json_data={"k": "v"}, timeout=5)
+        args, kwargs = _expected("POST", FAKE_URL, json_data={"k": "v"}, timeout=5)
+        client.request.assert_called_once_with(*args, **kwargs)
 
     def test_sync_request_with_engine(self):
         """验证 engine 参数传递给 SyncNet 构造函数。"""
@@ -256,7 +291,8 @@ class TestSyncGet:
         with patch("hs_net.shortcuts.SyncNet", return_value=client):
             resp = sync_get(FAKE_URL, params={"q": "test"})
 
-        client.request.assert_called_once_with("GET", FAKE_URL, params={"q": "test"})
+        args, kwargs = _expected("GET", FAKE_URL, params={"q": "test"})
+        client.request.assert_called_once_with(*args, **kwargs)
         assert resp is mock_resp
 
 
@@ -273,13 +309,14 @@ class TestSyncPost:
                 files={"f": b"data"},
             )
 
-        client.request.assert_called_once_with(
+        args, kwargs = _expected(
             "POST",
             FAKE_URL,
             json_data={"a": 1},
             form_data={"b": "2"},
             files={"f": b"data"},
         )
+        client.request.assert_called_once_with(*args, **kwargs)
 
 
 class TestSyncPut:
@@ -288,7 +325,8 @@ class TestSyncPut:
         with patch("hs_net.shortcuts.SyncNet", return_value=client):
             sync_put(FAKE_URL, json_data={"x": 1})
 
-        client.request.assert_called_once_with("PUT", FAKE_URL, json_data={"x": 1})
+        args, kwargs = _expected("PUT", FAKE_URL, json_data={"x": 1})
+        client.request.assert_called_once_with(*args, **kwargs)
 
 
 class TestSyncPatch:
@@ -297,7 +335,8 @@ class TestSyncPatch:
         with patch("hs_net.shortcuts.SyncNet", return_value=client):
             sync_patch(FAKE_URL, json_data={"x": 2})
 
-        client.request.assert_called_once_with("PATCH", FAKE_URL, json_data={"x": 2})
+        args, kwargs = _expected("PATCH", FAKE_URL, json_data={"x": 2})
+        client.request.assert_called_once_with(*args, **kwargs)
 
 
 class TestSyncDelete:
@@ -306,7 +345,8 @@ class TestSyncDelete:
         with patch("hs_net.shortcuts.SyncNet", return_value=client):
             sync_delete(FAKE_URL)
 
-        client.request.assert_called_once_with("DELETE", FAKE_URL)
+        args, kwargs = _expected("DELETE", FAKE_URL)
+        client.request.assert_called_once_with(*args, **kwargs)
 
 
 class TestSyncHead:
@@ -315,7 +355,8 @@ class TestSyncHead:
         with patch("hs_net.shortcuts.SyncNet", return_value=client):
             sync_head(FAKE_URL, params={"p": "1"})
 
-        client.request.assert_called_once_with("HEAD", FAKE_URL, params={"p": "1"})
+        args, kwargs = _expected("HEAD", FAKE_URL, params={"p": "1"})
+        client.request.assert_called_once_with(*args, **kwargs)
 
 
 class TestSyncOptions:
@@ -324,7 +365,8 @@ class TestSyncOptions:
         with patch("hs_net.shortcuts.SyncNet", return_value=client):
             sync_options(FAKE_URL)
 
-        client.request.assert_called_once_with("OPTIONS", FAKE_URL)
+        args, kwargs = _expected("OPTIONS", FAKE_URL)
+        client.request.assert_called_once_with(*args, **kwargs)
 
 
 # ===========================================================================

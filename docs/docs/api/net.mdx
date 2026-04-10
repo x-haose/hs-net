@@ -13,10 +13,11 @@ Net(
     retries: int = None,
     retry_delay: float = None,
     user_agent: str = None,
-    proxy: str = None,
+    proxy: str | ProxyService = None,
     verify: bool = None,
     raise_status: bool = None,
     allow_redirects: bool = None,
+    rate_limit: int | float | RateLimitConfig = None,
     concurrency: int = None,
     headers: dict[str, Any] = None,
     cookies: dict[str, Any] = None,
@@ -33,10 +34,11 @@ Net(
 | `retries` | `int` | `3` | 重试次数 |
 | `retry_delay` | `float` | `0.0` | 重试间隔（秒） |
 | `user_agent` | `str` | `"random"` | User-Agent |
-| `proxy` | `str` | `None` | 代理地址 |
-| `verify` | `bool` | `True` | SSL 验证 |
+| `proxy` | `str \| ProxyService` | `None` | 代理配置 |
+| `verify` | `bool` | `False` | SSL 验证 |
 | `raise_status` | `bool` | `True` | 非 2xx 是否抛异常 |
 | `allow_redirects` | `bool` | `True` | 是否跟随重定向 |
+| `rate_limit` | `int \| float \| RateLimitConfig` | `None` | 速率限制 |
 | `concurrency` | `int` | `None` | 最大并发数 |
 | `headers` | `dict` | `{}` | 全局请求头 |
 | `cookies` | `dict` | `{}` | 全局 cookies |
@@ -60,7 +62,6 @@ async def request(
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
-    proxy: str = None,
     verify: bool = None,
     retries: int = None,
     retry_delay: float = None,
@@ -133,7 +134,7 @@ async with Net() as net:
 async def close() -> None
 ```
 
-关闭客户端，释放底层引擎资源。
+关闭客户端，释放底层引擎和代理服务资源。
 
 ## 属性
 
@@ -145,6 +146,15 @@ def cookies(self) -> dict[str, str]
 ```
 
 获取当前会话的 cookies。
+
+### proxy_service
+
+```python
+@property
+def proxy_service(self) -> ProxyService | None
+```
+
+获取代理服务实例，可用于调用 `switch()` 切换代理。
 
 ## 信号装饰器
 
