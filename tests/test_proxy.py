@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from hs_net.proxy import (
+    ApiProxyProvider,
     FixedProxyProvider,
     ListProxyProvider,
     ProxyProvider,
@@ -219,3 +222,171 @@ class TestClientIntegration:
 
         async with Net(verify=False, retries=0) as net:
             assert net.proxy_service is None
+
+
+class TestAsyncGetProxy:
+    """async_get_proxy 测试。"""
+
+    @pytest.mark.asyncio
+    async def test_default_fallback_to_sync(self):
+        """默认 async_get_proxy 回退到同步 get_proxy。"""
+        provider = FixedProxyProvider("http://proxy:8080")
+        result = await provider.async_get_proxy()
+        assert result == "http://proxy:8080"
+
+    @pytest.mark.asyncio
+    async def test_async_fallback(self):
+        provider = ListProxyProvider(["a", "b", "c"])
+        assert await provider.async_get_proxy() == "a"
+        assert await provider.async_get_proxy() == "b"
+
+    @pytest.mark.asyncio
+    async def test_custom_async_override(self):
+        """自定义 Provider 可覆写 async_get_proxy。"""
+
+        class AsyncProvider(ProxyProvider):
+            def get_proxy(self) -> str:
+                return "sync://proxy:1080"
+
+            async def async_get_proxy(self) -> str:
+                return "async://proxy:1080"
+
+        provider = AsyncProvider()
+        assert provider.get_proxy() == "sync://proxy:1080"
+        assert await provider.async_get_proxy() == "async://proxy:1080"
+
+
+class TestApiProxyProvider:
+    """ApiProxyProvider 测试。"""
+
+    def test_sync_get_proxy(self):
+        """同步获取代理。"""
+        mock_resp = MagicMock()
+        mock_resp.text = "  http://1.2.3.4:8080  \n"
+        mock_resp.raise_for_status = MagicMock()
+
+        provider = ApiProxyProvider("https://api.pool.com/get")
+        with patch.object(provider, "_ensure_sync_client") as mock_client:
+            mock_client.return_value.get.return_value = mock_resp
+            result = provider.get_proxy()
+
+        assert result == "http://1.2.3.4:8080"
+
+    @pytest.mark.asyncio
+    async def test_async_get_proxy(self):
+        """异步获取代理。"""
+        mock_resp = MagicMock()
+        mock_resp.text = "socks5://5.6.7.8:1080"
+        mock_resp.raise_for_status = MagicMock()
+
+        provider = ApiProxyProvider("https://api.pool.com/get")
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_resp
+        with patch.object(provider, "_ensure_async_client", return_value=mock_client):
+            result = await provider.async_get_proxy()
+
+        assert result == "socks5://5.6.7.8:1080"
+
+    def test_custom_parser(self):
+        """自定义 parser 从 JSON 中提取。"""
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"data": {"proxy": "http://9.8.7.6:3128"}}
+        mock_resp.raise_for_status = MagicMock()
+
+        provider = ApiProxyProvider(
+            "https://api.pool.com/get",
+            parser=lambda resp: resp.json()["data"]["proxy"],
+        )
+        with patch.object(provider, "_ensure_sync_client") as mock_client:
+            mock_client.return_value.get.return_value = mock_resp
+            result = provider.get_proxy()
+
+        assert result == "http://9.8.7.6:3128"
+
+    def test_proxy_param_stored(self):
+        """proxy 参数正确存储。"""
+        provider = ApiProxyProvider(
+            "https://api.pool.com/get",
+            proxy="http://127.0.0.1:7897",
+        )
+        assert provider._proxy == "http://127.0.0.1:7897"
+
+    def test_close(self):
+        """close 关闭内部客户端。"""
+        provider = ApiProxyProvider("https://api.pool.com/get")
+        mock_sync = MagicMock()
+        provider._sync_client = mock_sync
+        provider.close()
+        mock_sync.close.assert_called_once()
+        assert provider._sync_client is None
+
+    @pytest.mark.asyncio
+    async def test_async_close(self):
+        """async_close 关闭异步客户端。"""
+        provider = ApiProxyProvider("https://api.pool.com/get")
+        mock_async = AsyncMock()
+        provider._async_client = mock_async
+        await provider.async_close()
+        mock_async.aclose.assert_called_once()
+        assert provider._async_client is None
+
+
+class TestProxyServiceWithApiProvider:
+    """ProxyService + ApiProxyProvider 集成测试。"""
+
+    def test_service_with_api_provider(self):
+        """ProxyService 接受 ApiProxyProvider。"""
+        provider = ApiProxyProvider("https://api.pool.com/get")
+        svc = ProxyService(provider=provider)
+        assert svc.provider is provider
+
+    @pytest.mark.asyncio
+    async def test_async_start_uses_async_get_proxy(self):
+        """async_start 使用 async_get_proxy。"""
+
+        class TrackingProvider(ProxyProvider):
+            def __init__(self):
+                self.sync_called = False
+                self.async_called = False
+
+            def get_proxy(self) -> str:
+                self.sync_called = True
+                return "http://127.0.0.1:8080"
+
+            async def async_get_proxy(self) -> str:
+                self.async_called = True
+                return "http://127.0.0.1:8080"
+
+        provider = TrackingProvider()
+        svc = ProxyService(provider=provider)
+        await svc.async_start()
+        try:
+            assert provider.async_called
+            assert not provider.sync_called
+        finally:
+            await svc.async_stop()
+
+    @pytest.mark.asyncio
+    async def test_async_switch(self):
+        """async_switch 使用 async_get_proxy。"""
+
+        class CountingProvider(ProxyProvider):
+            def __init__(self):
+                self.async_count = 0
+
+            def get_proxy(self) -> str:
+                return "http://127.0.0.1:8080"
+
+            async def async_get_proxy(self) -> str:
+                self.async_count += 1
+                return "http://127.0.0.1:8080"
+
+        provider = CountingProvider()
+        svc = ProxyService(provider=provider)
+        await svc.async_start()
+        try:
+            assert provider.async_count == 1  # async_start 调用了一次
+            await svc.async_switch()
+            assert provider.async_count == 2
+        finally:
+            await svc.async_stop()

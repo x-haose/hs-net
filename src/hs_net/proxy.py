@@ -31,8 +31,13 @@ import logging
 import random  # noqa: S311
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    import httpx
 
 logger = logging.getLogger("hs_net.proxy")
 
@@ -43,25 +48,49 @@ logger = logging.getLogger("hs_net.proxy")
 
 
 class ProxyProvider(ABC):
-    """代理提供者协议，用户实现此接口对接自己的代理源。"""
+    """代理提供者协议，用户实现此接口对接自己的代理源。
+
+    子类必须实现 :meth:`get_proxy`（同步）。如果需要异步获取代理（如调用代理池 API），
+    可额外覆写 :meth:`async_get_proxy`，默认实现会回退到同步 ``get_proxy()``。
+    """
 
     @abstractmethod
     def get_proxy(self) -> str:
-        """返回一个代理地址。
+        """返回一个代理地址（同步）。
 
         Returns:
             代理地址字符串，如 ``"socks5://host:port"``、``"http://user:pass@host:port"``。
         """
         ...
 
+    async def async_get_proxy(self) -> str:
+        """返回一个代理地址（异步）。
+
+        默认回退到同步 :meth:`get_proxy`，对于纯计算的 Provider 无需覆写。
+        需要异步 I/O（如调用代理池 API）时应覆写此方法。
+
+        Returns:
+            代理地址字符串。
+        """
+        return self.get_proxy()
+
 
 class FixedProxyProvider(ProxyProvider):
-    """固定代理提供者，始终返回同一个代理地址。"""
+    """固定代理提供者，始终返回同一个代理地址。
+
+    Args:
+        proxy: 代理地址字符串。
+    """
 
     def __init__(self, proxy: str):
         self._proxy = proxy
 
     def get_proxy(self) -> str:
+        """返回固定的代理地址。
+
+        Returns:
+            构造时传入的代理地址。
+        """
         return self._proxy
 
 
@@ -76,14 +105,153 @@ class ListProxyProvider(ProxyProvider):
     def __init__(self, proxies: list[str], strategy: str = "round_robin"):
         if not proxies:
             raise ValueError("代理列表不能为空")
+
         self._proxies = list(proxies)
         self._strategy = strategy
         self._cycle = itertools.cycle(self._proxies)
 
     def get_proxy(self) -> str:
+        """按策略从列表中选取一个代理地址。
+
+        Returns:
+            代理地址字符串。
+        """
         if self._strategy == "random":
             return random.choice(self._proxies)  # nosec B311  # noqa: S311
         return next(self._cycle)
+
+
+class ApiProxyProvider(ProxyProvider):
+    """代理池 API 提供者，通过 HTTP 请求从代理池获取代理地址。
+
+    内部使用轻量的 httpx 客户端（不经过 ProxyService），支持同步和异步。
+
+    Args:
+        api_url: 代理池 API 地址。
+        proxy: 访问 API 时使用的代理（如本地 Clash），不走 ProxyService。
+        parser: 自定义响应解析函数，接收 httpx.Response 返回代理地址字符串。
+            默认将响应体 strip 后直接作为代理地址。
+        timeout: 请求超时时间（秒），默认 10。
+
+    用法::
+
+        # 最简单 — API 直接返回代理地址文本
+        provider = ApiProxyProvider("https://api.pool.com/get")
+
+        # 从 JSON 响应中提取
+        provider = ApiProxyProvider(
+            "https://api.pool.com/get",
+            parser=lambda resp: resp.json()["data"]["proxy"],
+        )
+
+        # API 在墙外，需要本地 VPN 访问
+        provider = ApiProxyProvider(
+            "https://api.overseas-pool.com/get",
+            proxy="http://127.0.0.1:7897",
+        )
+    """
+
+    def __init__(
+        self,
+        api_url: str,
+        *,
+        proxy: str | None = None,
+        parser: Callable[[httpx.Response], str] | None = None,
+        timeout: float = 10.0,
+    ):
+        self._api_url = api_url
+        self._proxy = proxy
+        self._parser = parser
+        self._timeout = timeout
+        self._sync_client: httpx.Client | None = None
+        self._async_client: httpx.AsyncClient | None = None
+
+    def _ensure_sync_client(self) -> httpx.Client:
+        """确保同步 httpx 客户端已初始化并返回。
+
+        Returns:
+            httpx.Client 实例。
+        """
+        if self._sync_client is None:
+            import httpx as _httpx
+
+            self._sync_client = _httpx.Client(
+                proxy=self._proxy,
+                timeout=self._timeout,
+                verify=False,  # noqa: S501
+            )
+        return self._sync_client
+
+    def _ensure_async_client(self) -> httpx.AsyncClient:
+        """确保异步 httpx 客户端已初始化并返回。
+
+        Returns:
+            httpx.AsyncClient 实例。
+        """
+        if self._async_client is None:
+            import httpx as _httpx
+
+            self._async_client = _httpx.AsyncClient(
+                proxy=self._proxy,
+                timeout=self._timeout,
+                verify=False,  # noqa: S501
+            )
+        return self._async_client
+
+    def _parse_response(self, resp: httpx.Response) -> str:
+        """解析响应，提取代理地址。
+
+        Args:
+            resp: httpx 响应对象。
+
+        Returns:
+            代理地址字符串。
+
+        Raises:
+            httpx.HTTPStatusError: 当响应状态码非 2xx 时抛出。
+        """
+        resp.raise_for_status()
+        if self._parser:
+            return self._parser(resp)
+        return resp.text.strip()
+
+    def get_proxy(self) -> str:
+        """同步调用代理池 API 获取代理地址。
+
+        Returns:
+            代理地址字符串。
+        """
+        client = self._ensure_sync_client()
+        resp = client.get(self._api_url)
+        return self._parse_response(resp)
+
+    async def async_get_proxy(self) -> str:
+        """异步调用代理池 API 获取代理地址。
+
+        Returns:
+            代理地址字符串。
+        """
+        client = self._ensure_async_client()
+        resp = await client.get(self._api_url)
+        return self._parse_response(resp)
+
+    def close(self) -> None:
+        """关闭内部 HTTP 客户端。"""
+        if self._sync_client:
+            self._sync_client.close()
+            self._sync_client = None
+        if self._async_client:
+            # async client 需要在事件循环中关闭，这里标记为 None
+            self._async_client = None
+
+    async def async_close(self) -> None:
+        """异步关闭内部 HTTP 客户端。"""
+        if self._async_client:
+            await self._async_client.aclose()
+            self._async_client = None
+        if self._sync_client:
+            self._sync_client.close()
+            self._sync_client = None
 
 
 # ===========================================================================
@@ -104,6 +272,12 @@ class _ProxyInfo:
 
 def _parse_proxy(proxy_url: str) -> _ProxyInfo:
     """解析代理 URL 为结构化信息。
+
+    Args:
+        proxy_url: 代理地址字符串，如 ``"socks5://user:pass@host:port"``。
+
+    Returns:
+        解析后的 _ProxyInfo 结构。
 
     Raises:
         ValueError: 当代理地址无法解析时抛出。
@@ -133,7 +307,16 @@ async def _open_connection(
     port: int,
     transit_info: _ProxyInfo | None = None,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    """建立 TCP 连接，有中转代理时先通过中转建立隧道。"""
+    """建立 TCP 连接，有中转代理时先通过中转建立隧道。
+
+    Args:
+        host: 目标主机。
+        port: 目标端口。
+        transit_info: 中转代理信息，为 None 时直连。
+
+    Returns:
+        (StreamReader, StreamWriter) 元组。
+    """
     if not transit_info:
         return await asyncio.open_connection(host, port)
 
@@ -161,7 +344,23 @@ async def _connect_via_http_proxy(
     password: str | None = None,
     transit_info: _ProxyInfo | None = None,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    """通过 HTTP 代理建立 CONNECT 隧道。"""
+    """通过 HTTP 代理建立 CONNECT 隧道。
+
+    Args:
+        proxy_host: HTTP 代理主机。
+        proxy_port: HTTP 代理端口。
+        target_host: 最终目标主机。
+        target_port: 最终目标端口。
+        username: 代理认证用户名。
+        password: 代理认证密码。
+        transit_info: 中转代理信息，为 None 时直连代理。
+
+    Returns:
+        (StreamReader, StreamWriter) 元组。
+
+    Raises:
+        ConnectionError: 当 CONNECT 握手失败时抛出。
+    """
     reader, writer = await _open_connection(proxy_host, proxy_port, transit_info)
 
     connect_line = f"CONNECT {target_host}:{target_port} HTTP/1.1\r\n"
@@ -192,7 +391,23 @@ async def _connect_via_socks5(
     password: str | None = None,
     transit_info: _ProxyInfo | None = None,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    """通过 SOCKS5 代理建立连接。"""
+    """通过 SOCKS5 代理建立连接。
+
+    Args:
+        proxy_host: SOCKS5 代理主机。
+        proxy_port: SOCKS5 代理端口。
+        target_host: 最终目标主机。
+        target_port: 最终目标端口。
+        username: 代理认证用户名。
+        password: 代理认证密码。
+        transit_info: 中转代理信息，为 None 时直连代理。
+
+    Returns:
+        (StreamReader, StreamWriter) 元组。
+
+    Raises:
+        ConnectionError: 当 SOCKS5 握手失败时抛出。
+    """
     from socksio import (
         SOCKS5AType,
         SOCKS5AuthMethod,
@@ -261,7 +476,22 @@ async def _connect_via_socks4(
     username: str | None = None,
     transit_info: _ProxyInfo | None = None,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    """通过 SOCKS4 代理建立连接。"""
+    """通过 SOCKS4 代理建立连接。
+
+    Args:
+        proxy_host: SOCKS4 代理主机。
+        proxy_port: SOCKS4 代理端口。
+        target_host: 最终目标主机。
+        target_port: 最终目标端口。
+        username: SOCKS4 用户标识。
+        transit_info: 中转代理信息，为 None 时直连代理。
+
+    Returns:
+        (StreamReader, StreamWriter) 元组。
+
+    Raises:
+        ConnectionError: 当 SOCKS4 握手失败时抛出。
+    """
     from socksio import SOCKS4Command, SOCKS4Connection, SOCKS4Request
 
     reader, writer = await _open_connection(proxy_host, proxy_port, transit_info)
@@ -297,7 +527,17 @@ async def _connect_upstream(
     target_port: int,
     transit_info: _ProxyInfo | None = None,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    """根据代理类型选择连接方式。"""
+    """根据代理类型选择连接方式。
+
+    Args:
+        proxy_info: 上游代理信息。
+        target_host: 最终目标主机。
+        target_port: 最终目标端口。
+        transit_info: 中转代理信息，为 None 时直连上游代理。
+
+    Returns:
+        (StreamReader, StreamWriter) 元组。
+    """
     scheme = proxy_info.scheme
     host = proxy_info.host
     port = proxy_info.port
@@ -341,9 +581,11 @@ class _ProxyServer:
         self._transit_info: _ProxyInfo | None = None
         self._server: asyncio.Server | None = None
         self._port: int = 0
+        self._client_tasks: set[asyncio.Task] = set()
 
     @property
     def port(self) -> int:
+        """本地代理服务监听端口。"""
         return self._port
 
     def set_upstream(self, proxy_info: _ProxyInfo) -> None:
@@ -367,6 +609,10 @@ class _ProxyServer:
         同一个连接上可能有多个 HTTP 请求（keep-alive），循环处理。
         CONNECT 隧道建立后独占连接，不再循环。
         """
+        task = asyncio.current_task()
+        if task:
+            self._client_tasks.add(task)
+            task.add_done_callback(self._client_tasks.discard)
         try:
             while True:
                 # 读请求行
@@ -518,6 +764,13 @@ class _ProxyServer:
         if self._server:
             self._server.close()
             await self._server.wait_closed()
+            # 取消所有 pending 的客户端连接任务
+            tasks = list(self._client_tasks)
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            self._client_tasks.clear()
             self._server = None
             logger.info("代理服务已停止")
 
@@ -573,6 +826,13 @@ class ProxyService:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
 
+    def __del__(self):
+        try:
+            if self._started:
+                self.stop()
+        except Exception:  # nosec B110
+            pass
+
     @property
     def provider(self) -> ProxyProvider:
         """当前代理提供者。"""
@@ -591,27 +851,45 @@ class ProxyService:
         return self._started
 
     def _init_upstream(self) -> None:
-        """从 provider 获取代理并设置上游。"""
+        """从 provider 同步获取代理并设置上游。"""
         proxy_url = self._provider.get_proxy()
         proxy_info = _parse_proxy(proxy_url)
         self._server.set_upstream(proxy_info)
         self._server.set_transit(self._transit_info)
 
-    async def _async_switch(self) -> None:
-        """在事件循环线程中切换上游，避免线程竞争。"""
-        self._init_upstream()
+    async def _async_init_upstream(self) -> None:
+        """从 provider 异步获取代理并设置上游。"""
+        proxy_url = await self._provider.async_get_proxy()
+        proxy_info = _parse_proxy(proxy_url)
+        self._server.set_upstream(proxy_info)
+        self._server.set_transit(self._transit_info)
 
     def switch(self) -> None:
-        """切换到新代理（调用 provider.get_proxy() 获取新地址）。"""
+        """切换到新代理（同步，调用 provider.get_proxy()）。"""
         if not self._started:
             raise RuntimeError("ProxyService 尚未启动")
-        if self._loop:
-            # 同步模式：通过事件循环调度，确保线程安全
-            future = asyncio.run_coroutine_threadsafe(self._async_switch(), self._loop)
-            future.result(timeout=5)
-        else:
-            # 异步模式：已在事件循环线程中，直接调用
-            self._init_upstream()
+        try:
+            if self._loop:
+                # 同步模式（后台事件循环线程）：通过事件循环调度，确保线程安全
+                future = asyncio.run_coroutine_threadsafe(self._sync_switch_in_loop(), self._loop)
+                future.result(timeout=5)
+            else:
+                self._init_upstream()
+        except Exception as e:
+            raise e.with_traceback(None) from None
+
+    async def _sync_switch_in_loop(self) -> None:
+        """在后台事件循环线程中同步切换上游（供 switch() 调度）。"""
+        self._init_upstream()
+
+    async def async_switch(self) -> None:
+        """切换到新代理（异步，调用 provider.async_get_proxy()）。"""
+        if not self._started:
+            raise RuntimeError("ProxyService 尚未启动")
+        try:
+            await self._async_init_upstream()
+        except Exception as e:
+            raise e.with_traceback(None) from None
 
     # ---- 异步启停 ----
 
@@ -620,7 +898,11 @@ class ProxyService:
         if self._started:
             return
         self._server = _ProxyServer()
-        self._init_upstream()
+        try:
+            await self._async_init_upstream()
+        except Exception as e:
+            self._server = None
+            raise e.with_traceback(None) from None
         await self._server.start()
         self._started = True
 
@@ -630,6 +912,9 @@ class ProxyService:
             return
         if self._server:
             await self._server.stop()
+        # 关闭 ApiProxyProvider 的异步客户端
+        if isinstance(self._provider, ApiProxyProvider):
+            await self._provider.async_close()
         self._started = False
 
     # ---- 同步启停（在后台线程跑事件循环） ----
@@ -661,7 +946,7 @@ class ProxyService:
         if start_error:
             self._loop = None
             self._thread = None
-            raise RuntimeError(f"ProxyService 启动失败: {start_error[0]}") from start_error[0]
+            raise start_error[0].with_traceback(None) from None
         if not self._started:
             self._loop = None
             self._thread = None
@@ -684,6 +969,9 @@ class ProxyService:
             future.result(timeout=5)
             # noinspection PyTypeChecker
             self._loop.call_soon_threadsafe(self._loop.stop)
+        # 关闭 ApiProxyProvider 的同步客户端
+        if isinstance(self._provider, ApiProxyProvider):
+            self._provider.close()
         if self._thread:
             self._thread.join(timeout=5)
         self._started = False

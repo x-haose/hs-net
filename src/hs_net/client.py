@@ -142,13 +142,17 @@ class Net:
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
+        self._closed = False
+
         # 所有代理统一走 ProxyService
         self._proxy_service: ProxyService | None = None
+        self._owns_proxy_service: bool = False
         proxy = proxy if proxy is not None else (config.proxy if config else None)
         if isinstance(proxy, ProxyService):
             self._proxy_service = proxy
         elif isinstance(proxy, str):
             self._proxy_service = ProxyService(proxy)
+            self._owns_proxy_service = True
         proxy = None  # 代理由 __aenter__ 启动 ProxyService 后注入
 
         self._config = merge_config(
@@ -171,7 +175,6 @@ class Net:
         )
 
         self._engine = self._create_engine()
-        self._closed = False
         self._rate_limiter = _build_rate_limiter(self._config.rate_limit)
 
         # 信号中间件
@@ -215,14 +218,17 @@ class Net:
             return
         self._closed = True
         await self._engine.close()
-        if self._proxy_service and self._proxy_service.started:
+        if self._owns_proxy_service and self._proxy_service and self._proxy_service.started:
             await self._proxy_service.async_stop()
 
     def __del__(self):
-        if not self._closed:
-            import warnings
+        try:
+            if not self._closed:
+                import warnings
 
-            warnings.warn(f"未关闭的 {self!r}，请使用 async with 或手动调用 close()", ResourceWarning, stacklevel=2)
+                warnings.warn(f"未关闭的 {self!r}，请使用 async with 或手动调用 close()", ResourceWarning, stacklevel=2)
+        except Exception:  # nosec B110
+            pass
 
     async def __aenter__(self):
         if self._closed:

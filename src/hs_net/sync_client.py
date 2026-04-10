@@ -136,13 +136,17 @@ class SyncNet:
             engine_options: 引擎特定配置（如 http2、impersonate 等）。
             config: NetConfig 配置对象，与其他参数合并（其他参数优先）。
         """
+        self._closed = False
+
         # 所有代理统一走 ProxyService
         self._proxy_service: ProxyService | None = None
+        self._owns_proxy_service: bool = False
         proxy = proxy if proxy is not None else (config.proxy if config else None)
         if isinstance(proxy, ProxyService):
             self._proxy_service = proxy
         elif isinstance(proxy, str):
             self._proxy_service = ProxyService(proxy)
+            self._owns_proxy_service = True
         if self._proxy_service:
             if not self._proxy_service.started:
                 self._proxy_service.start()
@@ -180,7 +184,6 @@ class SyncNet:
             **engine_options,
         )
 
-        self._closed = False
         self._rate_limiter = _build_sync_rate_limiter(self._config.rate_limit)
 
         # 信号中间件
@@ -209,14 +212,17 @@ class SyncNet:
             return
         self._closed = True
         self._engine.close()
-        if self._proxy_service and self._proxy_service.started:
+        if self._owns_proxy_service and self._proxy_service and self._proxy_service.started:
             self._proxy_service.stop()
 
     def __del__(self):
-        if not self._closed:
-            import warnings
+        try:
+            if not self._closed:
+                import warnings
 
-            warnings.warn(f"未关闭的 {self!r}，请使用 with 或手动调用 close()", ResourceWarning, stacklevel=2)
+                warnings.warn(f"未关闭的 {self!r}，请使用 with 或手动调用 close()", ResourceWarning, stacklevel=2)
+        except Exception:  # nosec B110
+            pass
 
     def __enter__(self):
         return self

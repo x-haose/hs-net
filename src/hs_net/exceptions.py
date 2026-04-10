@@ -8,9 +8,13 @@ _original_excepthook = sys.excepthook
 
 
 def _hs_net_excepthook(exc_type, exc_value, exc_tb):
-    """自定义异常钩子：对 hs-net 异常只展示用户代码帧，过滤内部堆栈。"""
-    if isinstance(exc_value, RequestException):
-        entries = _tb_module.extract_tb(exc_tb)
+    """自定义异常钩子：过滤内部堆栈，只展示用户代码帧。
+
+    对 RequestException 及从 hs-net 内部抛出的异常生效。
+    """
+    entries = _tb_module.extract_tb(exc_tb)
+    has_hs_net = any("/hs_net/" in e.filename for e in entries)
+    if isinstance(exc_value, RequestException) or has_hs_net:
         filtered = [e for e in entries if not any(p in e.filename for p in _INTERNAL_PATHS)]
         sys.stderr.write("Traceback (most recent call last):\n")
         for line in _tb_module.format_list(filtered):
