@@ -2,6 +2,18 @@
 
 hs-net 内置代理归一化服务（`ProxyService`），统一处理 HTTP/SOCKS/认证代理，对外暴露纯 HTTP 本地代理。
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [简单代理](#简单代理) | 字符串方式指定代理 | [`fixed_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/fixed_proxy.py) |
+| [代理认证](#代理认证) | HTTP Basic / SOCKS 认证 | — |
+| [列表轮换](#列表轮换) | 多个代理轮询或随机 | [`switch_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/switch_proxy.py) |
+| [自定义代理源](#自定义代理源) | 实现 ProxyProvider 接口 | [`custom_provider.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/custom_provider.py) |
+| [代理池 API](#代理池-api) | ApiProxyProvider 对接代理池 | [`api_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/api_proxy.py) |
+| [代理链](#代理链中转代理) | 通过中转代理连接上游 | [`transit_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/transit_proxy.py) |
+| [异步代理](#异步代理) | 异步客户端搭配代理 | [`async_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/async_proxy.py) |
+
 ## 简单代理
 
 直接传字符串，支持 HTTP、HTTPS、SOCKS4、SOCKS5 及认证格式：
@@ -33,6 +45,8 @@ with SyncNet(proxy="http://user:password@proxy-host:8080") as net:
 with SyncNet(proxy="socks5://user:password@proxy-host:1080") as net:
     resp = net.get("https://example.com")
 ```
+
+完整示例见 [`examples/proxy/fixed_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/fixed_proxy.py)。
 
 :::tip 支持的代理格式
 | 格式 | 示例 |
@@ -138,9 +152,11 @@ with SyncNet(proxy=proxy) as net:
     net.proxy_service.switch()  # 随机切换
 ```
 
+完整示例见 [`examples/proxy/switch_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/switch_proxy.py)。
+
 ### 自定义代理源
 
-实现 `ProxyProvider` 接口，对接自己的代理 API：
+实现 `ProxyProvider` 接口，对接自己的代理源：
 
 ```python title="custom_provider.py"
 from hs_net import Net, ProxyService, ProxyProvider
@@ -149,15 +165,90 @@ class MyProvider(ProxyProvider):
     """从代理 API 获取代理地址。"""
 
     def get_proxy(self) -> str:
-        # 这里可以调用你的代理 API
+        # 同步获取代理
+        return "socks5://1.2.3.4:1080"
+
+    async def async_get_proxy(self) -> str:
+        # 异步获取代理（可选，默认回退到 get_proxy）
         return "socks5://1.2.3.4:1080"
 
 proxy = ProxyService(provider=MyProvider())
 
 async with Net(proxy=proxy) as net:
     resp = await net.get("https://example.com")
-    net.proxy_service.switch()  # 调用 provider.get_proxy() 获取新代理
+    await net.proxy_service.async_switch()  # 异步切换代理
 ```
+
+完整示例见 [`examples/proxy/custom_provider.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/custom_provider.py)。
+
+:::tip 同步 vs 异步
+`ProxyProvider` 提供两个方法：
+
+- `get_proxy()` — 同步版本，**必须实现**
+- `async_get_proxy()` — 异步版本，**可选**，默认回退到 `get_proxy()`
+
+`Net`（异步客户端）启动和切换代理时调用 `async_get_proxy()`，`SyncNet` 调用 `get_proxy()`。
+对于纯计算的 Provider（如 `FixedProxyProvider`、`ListProxyProvider`），只实现 `get_proxy()` 即可。
+需要异步 I/O 时（如调用代理池 API），应覆写 `async_get_proxy()`。
+:::
+
+### 代理池 API
+
+使用内置的 `ApiProxyProvider` 对接代理池 API，自动获取代理地址：
+
+```python title="api_proxy_simple.py"
+from hs_net import ApiProxyProvider, Net, ProxyService
+
+# 最简单 — API 直接返回代理地址文本
+provider = ApiProxyProvider("https://api.pool.com/get")
+
+svc = ProxyService(provider=provider)
+async with Net(proxy=svc) as net:
+    resp = await net.get("https://example.com")
+```
+
+从 JSON 响应中提取代理地址：
+
+```python title="api_proxy_json.py"
+from httpx import Response as HttpxResponse
+from hs_net import ApiProxyProvider, Net, ProxyService
+
+def parse_proxy(resp: HttpxResponse) -> str:
+    data = resp.json()
+    item = data["data"][0]
+    return f"http://{item['ip']}:{item['port']}"
+
+provider = ApiProxyProvider(
+    "https://api.pool.com/get?num=1",
+    parser=parse_proxy,
+)
+
+svc = ProxyService(provider=provider)
+async with Net(proxy=svc) as net:
+    resp = await net.get("https://example.com")
+    await svc.async_switch()  # 从 API 获取新代理并切换
+```
+
+访问代理池 API 需要翻墙时，指定 `proxy` 参数：
+
+```python title="api_proxy_with_proxy.py"
+provider = ApiProxyProvider(
+    "https://api.overseas-pool.com/get",
+    proxy="http://127.0.0.1:7897",  # 通过本地 Clash 访问 API
+    parser=parse_proxy,
+)
+```
+
+`ApiProxyProvider` 参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `api_url` | `str` | 代理池 API 地址 |
+| `proxy` | `str \| None` | 访问 API 用的代理（如本地 VPN） |
+| `parser` | `Callable[[httpx.Response], str] \| None` | 自定义响应解析函数，默认 `resp.text.strip()` |
+| `timeout` | `float` | 请求超时（秒），默认 10 |
+
+完整示例见 [`examples/proxy/api_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/api_proxy.py)。
 
 ### 代理链（中转代理）
 
@@ -178,6 +269,41 @@ async with Net(proxy=proxy) as net:
 
 流量路径：`客户端 → 本地 Clash → 海外代理 → 目标网站`
 
+完整示例见 [`examples/proxy/transit_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/transit_proxy.py)。
+
+## 异步代理
+
+异步客户端搭配 ProxyService 使用，循环验证所有异步引擎均支持代理：
+
+```python title="async_proxy.py"
+import asyncio
+from hs_net import EngineEnum, Net, ProxyService
+
+PROXY = "http://127.0.0.1:8080"
+TEST_URL = "http://ip-api.com/json/"
+
+ASYNC_ENGINES = [
+    EngineEnum.HTTPX,
+    EngineEnum.AIOHTTP,
+    EngineEnum.CURL_CFFI,
+    EngineEnum.REQUESTS_GO,
+]
+
+async def main():
+    svc = ProxyService(PROXY)
+
+    for engine in ASYNC_ENGINES:
+        async with Net(proxy=svc, engine=engine, retries=0, timeout=30) as net:
+            resp = await net.get(TEST_URL)
+            ip = resp.json_data["query"]
+            print(f"{engine.value:12s} -> IP: {ip}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+完整示例见 [`examples/proxy/async_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/async_proxy.py)。
+
 ## 代理工作原理
 
 当使用 `ProxyService` 时，hs-net 会在本地启动一个 HTTP 代理服务器（`127.0.0.1` 随机端口），自动处理：
@@ -185,6 +311,27 @@ async with Net(proxy=proxy) as net:
 1. **协议转换**：将 SOCKS4/SOCKS5 代理统一为 HTTP 代理
 2. **认证处理**：自动注入代理认证头
 3. **代理链**：支持通过中转代理连接上游
-4. **热切换**：调用 `switch()` 即可切换上游代理，无需重建连接
+4. **代理池 API**：内置 `ApiProxyProvider`，支持同步/异步获取代理
+5. **热切换**：调用 `switch()` / `async_switch()` 即可切换上游代理，无需重建连接
 
 所有引擎只需连接本地 HTTP 代理，无需各自处理 SOCKS 协议和认证。
+
+## ProxyService 生命周期
+
+当你传入 `proxy="http://..."` 字符串时，`Net`/`SyncNet` 内部创建 ProxyService 并在 `close()` 时自动停止。
+
+当你传入 `proxy=svc`（ProxyService 实例）时，`close()` **不会**停止它，你可以跨多个客户端复用同一个 ProxyService：
+
+```python title="reuse_proxy_service.py"
+from hs_net import EngineEnum, ProxyService, SyncNet
+
+svc = ProxyService("socks5://proxy:1080")
+
+# 同一个 ProxyService 跨多个引擎复用
+for engine in [EngineEnum.HTTPX, EngineEnum.CURL_CFFI]:
+    with SyncNet(proxy=svc, engine=engine) as net:
+        resp = net.get("https://example.com")
+    svc.switch()  # close() 不会停止 svc，switch 正常工作
+
+# ProxyService 出作用域后自动清理
+```

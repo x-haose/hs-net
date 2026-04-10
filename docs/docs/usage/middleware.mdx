@@ -2,6 +2,15 @@
 
 hs-net 提供三个信号钩子，用于在请求生命周期中注入自定义逻辑。
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [请求前中间件](#请求前中间件) | 修改请求、添加 Header | [`request_before.py`](https://github.com/x-haose/hs-net/blob/main/examples/middleware/request_before.py) |
+| [响应后中间件](#响应后中间件) | 处理响应、计时统计 | [`response_after.py`](https://github.com/x-haose/hs-net/blob/main/examples/middleware/response_after.py) |
+| [重试中间件](#重试中间件) | 记录重试原因 | [`retry.py`](https://github.com/x-haose/hs-net/blob/main/examples/middleware/retry.py) |
+| [实战：请求计时](#实战请求计时) | 综合示例 | [`cache.py`](https://github.com/x-haose/hs-net/blob/main/examples/middleware/cache.py) |
+
 ## 三种信号
 
 | 信号 | 触发时机 | 接收参数 | 可返回 |

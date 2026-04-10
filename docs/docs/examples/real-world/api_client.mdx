@@ -1,0 +1,54 @@
+# REST API 客户端
+
+> 源码: [https://github.com/x-haose/hs-net/blob/main/examples/real_world/api_client.py](https://github.com/x-haose/hs-net/blob/main/examples/real_world/api_client.py)
+
+```python title="api_client.py"
+"""
+REST API 客户端
+
+使用 NetConfig 封装一个简单的 REST API 客户端。
+"""
+
+import asyncio
+
+from hs_net import Net, NetConfig
+
+
+async def main():
+    config = NetConfig(
+        base_url="https://httpbin.org",
+        timeout=15.0,
+        retries=2,
+        retry_delay=0.5,
+        user_agent="MyAPIClient/1.0",
+        headers={"Accept": "application/json"},
+    )
+
+    async with Net(config=config) as api:
+        # 获取资源列表
+        resp = await api.get("/get", params={"type": "user", "limit": "10"})
+        print(f"API GET: {resp.jmespath('args')}")
+
+        # 创建资源
+        resp = await api.post(
+            "/post",
+            json_data={
+                "name": "新用户",
+                "email": "user@example.com",
+            },
+        )
+        print(f"API POST: {resp.jmespath('json.name')}")
+
+        # 更新资源
+        resp = await api.put(
+            "/put",
+            json_data={
+                "name": "更新后的用户",
+            },
+        )
+        print(f"API PUT: {resp.jmespath('json.name')}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```

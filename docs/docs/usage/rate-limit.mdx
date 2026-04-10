@@ -9,6 +9,15 @@ pip install hs-net[sp]
 ```
 :::
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [简单限速](#简单限速) | int/float 快捷配置 | [`rate_limit.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py) |
+| [RateLimitConfig](#ratelimitconfig) | 详细限速配置 | [`rate_limit.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py) |
+| [按域名限速](#按域名限速) | 不同域名不同速率 | [`rate_limit.py`](https://github.com/x-haose/hs-net/blob/main/examples/config/rate_limit.py) |
+| [与并发控制的区别](#与并发控制的区别) | 限速 vs 并发 | — |
+
 ## 简单限速
 
 传入数字即表示每秒最多多少个请求：

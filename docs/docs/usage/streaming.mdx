@@ -2,6 +2,15 @@
 
 流式响应允许分块读取响应体，无需将整个响应加载到内存。适用于大文件下载、SSE 等场景。
 
+## 章节概览
+
+| 章节 | 说明 | 示例文件 |
+|------|------|----------|
+| [异步流式下载](#异步流式下载) | Net 流式请求 | [`streaming.py`](https://github.com/x-haose/hs-net/blob/main/examples/engine/streaming.py) |
+| [同步流式下载](#同步流式下载) | SyncNet 流式请求 | [`streaming.py`](https://github.com/x-haose/hs-net/blob/main/examples/engine/streaming.py) |
+| [StreamResponse 属性](#streamresponse-属性) | 流响应对象 | — |
+| [多引擎支持](#多引擎支持) | 各引擎流式兼容性 | — |
+
 ## 异步流式下载
 
 ```python
