@@ -39,7 +39,6 @@ class RequestModel:
         headers: 请求头。
         cookies: 请求携带的 cookies。
         timeout: 请求超时时间（秒）。
-        proxy: 代理地址。
         retries: 重试次数。
         retry_delay: 重试间隔时间（秒）。
     """
