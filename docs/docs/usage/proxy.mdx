@@ -12,6 +12,7 @@ hs-net 内置代理归一化服务（`ProxyService`），统一处理 HTTP/SOCKS
 | [自定义代理源](#自定义代理源) | 实现 ProxyProvider 接口 | [`custom_provider.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/custom_provider.py) |
 | [代理池 API](#代理池-api) | ApiProxyProvider 对接代理池 | [`api_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/api_proxy.py) |
 | [代理链](#代理链中转代理) | 通过中转代理连接上游 | [`transit_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/transit_proxy.py) |
+| [域名路由](#域名路由) | 按域名走不同代理或直连 | [`domain_rules.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/domain_rules.py) |
 | [异步代理](#异步代理) | 异步客户端搭配代理 | [`async_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/async_proxy.py) |
 
 ## 简单代理
@@ -271,6 +272,65 @@ async with Net(proxy=proxy) as net:
 
 完整示例见 [`examples/proxy/transit_proxy.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/transit_proxy.py)。
 
+### 域名路由
+
+通过 `rules` 参数按域名路由到不同代理，支持通配符匹配和 `"direct"` 直连：
+
+```python title="domain_rules.py"
+from hs_net import Net, ProxyService
+
+svc = ProxyService(
+    "http://default-proxy:8080",   # 未匹配域名走默认代理
+    rules={
+        "*.cn": "direct",               # 国内网站直连
+        "*.google.com": "socks5://proxy1:1080",  # Google 走 SOCKS5
+        "github.com": "http://proxy2:8080",      # GitHub 走 HTTP 代理
+    },
+)
+
+async with Net(proxy=svc) as net:
+    await net.get("https://baidu.cn")        # → 直连
+    await net.get("https://www.google.com")  # → proxy1
+    await net.get("https://github.com")      # → proxy2
+    await net.get("https://example.com")     # → default-proxy
+```
+
+同步客户端同理：
+
+```python title="domain_rules_sync.py"
+from hs_net import ProxyService, SyncNet
+
+svc = ProxyService(
+    "http://default-proxy:8080",
+    rules={"*.cn": "direct"},
+)
+
+with SyncNet(proxy=svc) as net:
+    net.get("https://baidu.cn")     # → 直连
+    net.get("https://example.com")  # → default-proxy
+```
+
+域名匹配规则：
+
+| 模式 | 说明 | 匹配示例 |
+|------|------|----------|
+| `github.com` | 精确匹配 | `github.com` |
+| `*.google.com` | 通配符（子域名） | `www.google.com`、`mail.google.com` |
+| `*.cn` | TLD 通配符 | `baidu.cn`、`www.baidu.cn` |
+| `"direct"` | 直连，不走代理 | — |
+
+:::tip 匹配优先级
+规则按 dict 插入顺序匹配，**先匹配先命中**。如果多个规则都能匹配同一个域名，只有第一个生效。
+
+`switch()` / `async_switch()` 在 rules 模式下只切换**未匹配域名的默认代理**，不影响已匹配的规则。
+:::
+
+:::warning 仅域名匹配
+rules 只支持域名级别匹配，不支持路径（如 `example.com/api`）。原因是 HTTPS 流量走 CONNECT 隧道，路径在 TLS 加密内，代理层无法看到。
+:::
+
+完整示例见 [`examples/proxy/domain_rules.py`](https://github.com/x-haose/hs-net/blob/main/examples/proxy/domain_rules.py)。
+
 ## 异步代理
 
 异步客户端搭配 ProxyService 使用，循环验证所有异步引擎均支持代理：
@@ -312,7 +372,8 @@ if __name__ == "__main__":
 2. **认证处理**：自动注入代理认证头
 3. **代理链**：支持通过中转代理连接上游
 4. **代理池 API**：内置 `ApiProxyProvider`，支持同步/异步获取代理
-5. **热切换**：调用 `switch()` / `async_switch()` 即可切换上游代理，无需重建连接
+5. **域名路由**：通过 `rules` 参数按域名匹配不同代理或直连
+6. **热切换**：调用 `switch()` / `async_switch()` 即可切换上游代理，无需重建连接
 
 所有引擎只需连接本地 HTTP 代理，无需各自处理 SOCKS 协议和认证。
 

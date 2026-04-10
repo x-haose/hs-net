@@ -390,3 +390,156 @@ class TestProxyServiceWithApiProvider:
             assert provider.async_count == 2
         finally:
             await svc.async_stop()
+
+
+class TestDomainMatch:
+    """域名规则匹配测试。"""
+
+    def test_exact_match(self):
+        from hs_net.proxy import _match_domain
+
+        rules = [("github.com", "hit")]
+        assert _match_domain("github.com", rules) == "hit"
+
+    def test_wildcard_match(self):
+        from hs_net.proxy import _match_domain
+
+        rules = [("*.google.com", "hit")]
+        assert _match_domain("www.google.com", rules) == "hit"
+        assert _match_domain("mail.google.com", rules) == "hit"
+
+    def test_tld_wildcard(self):
+        from hs_net.proxy import _match_domain
+
+        rules = [("*.cn", "hit")]
+        assert _match_domain("baidu.cn", rules) == "hit"
+        assert _match_domain("www.baidu.cn", rules) == "hit"
+
+    def test_no_match_returns_none(self):
+        from hs_net.proxy import _match_domain
+
+        rules = [("github.com", "hit")]
+        assert _match_domain("google.com", rules) is None
+
+    def test_first_match_wins(self):
+        from hs_net.proxy import _match_domain
+
+        rules = [("*.com", "first"), ("github.com", "second")]
+        assert _match_domain("github.com", rules) == "first"
+
+    def test_empty_rules(self):
+        from hs_net.proxy import _match_domain
+
+        assert _match_domain("github.com", []) is None
+
+    def test_direct_sentinel(self):
+        from hs_net.proxy import DIRECT, _match_domain
+
+        rules = [("*.cn", DIRECT)]
+        result = _match_domain("baidu.cn", rules)
+        assert result is DIRECT
+        assert repr(result) == "DIRECT"
+
+
+class TestProxyServerRules:
+    """_ProxyServer 域名路由测试。"""
+
+    def test_resolve_upstream_exact(self):
+        from hs_net.proxy import DIRECT, _parse_proxy, _ProxyServer
+
+        server = _ProxyServer()
+        server.set_rules(
+            [
+                ("github.com", _parse_proxy("http://proxy1:8080")),
+                ("*.cn", DIRECT),
+            ]
+        )
+        server.set_upstream(_parse_proxy("http://default:8080"))
+
+        result = server._resolve_upstream("github.com")
+        assert result.host == "proxy1"
+
+    def test_resolve_upstream_direct(self):
+        from hs_net.proxy import DIRECT, _parse_proxy, _ProxyServer
+
+        server = _ProxyServer()
+        server.set_rules([("*.cn", DIRECT)])
+        server.set_upstream(_parse_proxy("http://default:8080"))
+
+        result = server._resolve_upstream("baidu.cn")
+        assert result is DIRECT
+
+    def test_resolve_upstream_fallback(self):
+        from hs_net.proxy import _parse_proxy, _ProxyServer
+
+        server = _ProxyServer()
+        server.set_rules([("github.com", _parse_proxy("http://proxy1:8080"))])
+        server.set_upstream(_parse_proxy("http://default:8080"))
+
+        result = server._resolve_upstream("google.com")
+        assert result.host == "default"
+
+    def test_resolve_upstream_no_rules(self):
+        from hs_net.proxy import _parse_proxy, _ProxyServer
+
+        server = _ProxyServer()
+        server.set_upstream(_parse_proxy("http://default:8080"))
+
+        result = server._resolve_upstream("anything.com")
+        assert result.host == "default"
+
+
+class TestProxyServiceRules:
+    """ProxyService 域名路由规则测试。"""
+
+    def test_rules_param(self):
+        svc = ProxyService(
+            "http://default:8080",
+            rules={"*.cn": "direct", "github.com": "http://proxy1:8080"},
+        )
+        assert svc.started is False
+
+    def test_rules_sync_start(self):
+        svc = ProxyService(
+            "http://127.0.0.1:8080",
+            rules={"*.cn": "direct"},
+        )
+        svc.start()
+        assert svc.started
+        svc.stop()
+
+    @pytest.mark.asyncio
+    async def test_rules_async_start(self):
+        svc = ProxyService(
+            "http://127.0.0.1:8080",
+            rules={"*.cn": "direct"},
+        )
+        await svc.async_start()
+        assert svc.started
+        await svc.async_stop()
+
+    def test_rules_none_by_default(self):
+        """不传 rules 时行为不变。"""
+        svc = ProxyService("http://127.0.0.1:8080")
+        svc.start()
+        assert svc.started
+        svc.stop()
+
+    def test_rules_parsed_correctly(self):
+        """rules 内部正确解析为 _ProxyInfo 和 DIRECT。"""
+        from hs_net.proxy import DIRECT, _ProxyInfo
+
+        svc = ProxyService(
+            "http://default:8080",
+            rules={
+                "*.cn": "direct",
+                "github.com": "socks5://proxy1:1080",
+            },
+        )
+        assert len(svc._rules) == 2
+        assert svc._rules[0] == ("*.cn", DIRECT)
+        pattern, info = svc._rules[1]
+        assert pattern == "github.com"
+        assert isinstance(info, _ProxyInfo)
+        assert info.scheme == "socks5"
+        assert info.host == "proxy1"

@@ -33,6 +33,7 @@ import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
+from fnmatch import fnmatch
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -295,6 +296,39 @@ def _parse_proxy(proxy_url: str) -> _ProxyInfo:
         username=parsed.username,
         password=parsed.password,
     )
+
+
+class _DirectType:
+    """直连哨兵，区分 direct 和未命中。"""
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return "DIRECT"
+
+
+DIRECT = _DirectType()
+
+
+def _match_domain(domain: str, rules: list[tuple]) -> object | None:
+    """按顺序匹配域名规则，返回第一个命中的值。
+
+    Args:
+        domain: 目标域名。
+        rules: 规则列表，每项为 (pattern, value)。
+
+    Returns:
+        命中规则的 value，未命中返回 None。
+    """
+    for pattern, value in rules:
+        if fnmatch(domain, pattern):
+            return value
+    return None
 
 
 # ===========================================================================
@@ -579,6 +613,7 @@ class _ProxyServer:
     def __init__(self):
         self._proxy_info: _ProxyInfo | None = None
         self._transit_info: _ProxyInfo | None = None
+        self._rules: list[tuple[str, _ProxyInfo | _DirectType]] = []
         self._server: asyncio.Server | None = None
         self._port: int = 0
         self._client_tasks: set[asyncio.Task] = set()
@@ -598,6 +633,25 @@ class _ProxyServer:
         self._transit_info = transit_info
         if transit_info:
             logger.debug(f"代理服务中转: {transit_info.scheme}://{transit_info.host}:{transit_info.port}")
+
+    def set_rules(self, rules: list[tuple[str, _ProxyInfo | _DirectType]]) -> None:
+        """设置域名路由规则。"""
+        self._rules = rules
+
+    def _resolve_upstream(self, domain: str) -> _ProxyInfo | _DirectType:
+        """根据域名解析上游代理。
+
+        Args:
+            domain: 目标域名。
+
+        Returns:
+            _ProxyInfo 走对应代理，DIRECT 直连。
+        """
+        if self._rules:
+            matched = _match_domain(domain, self._rules)
+            if matched is not None:
+                return matched
+        return self._proxy_info
 
     async def _handle_client(
         self,
@@ -669,13 +723,20 @@ class _ProxyServer:
             target_host = target
             target_port = 443
 
-        # 连接上游（有中转时先通过中转）
-        upstream_reader, upstream_writer = await _connect_upstream(
-            self._proxy_info,
-            target_host,
-            target_port,
-            self._transit_info,
-        )
+        # 根据域名解析上游
+        upstream_info = self._resolve_upstream(target_host)
+
+        if isinstance(upstream_info, _DirectType):
+            # 直连目标
+            upstream_reader, upstream_writer = await asyncio.open_connection(target_host, target_port)
+        else:
+            # 通过上游代理连接（有中转时先通过中转）
+            upstream_reader, upstream_writer = await _connect_upstream(
+                upstream_info,
+                target_host,
+                target_port,
+                self._transit_info,
+            )
 
         try:
             # 告诉客户端连接已建立
@@ -697,21 +758,29 @@ class _ProxyServer:
         header_lines: list[bytes],
     ) -> None:
         """处理单个 HTTP 请求转发，每次使用当前上游配置。"""
-        proxy_info = self._proxy_info
-        scheme = proxy_info.scheme
+        # 解析目标域名（所有分支都需要）
+        request_line = header_lines[0].decode().strip()
+        parts = request_line.split()
+        url = urlparse(parts[1])
+        target_host = url.hostname or ""
+        target_port = url.port or 80
 
-        if scheme in ("socks5", "socks5h", "socks4", "socks4a"):
-            # SOCKS 上游：解析目标地址，通过 SOCKS 隧道直连目标
-            request_line = header_lines[0].decode().strip()
-            parts = request_line.split()
-            url = urlparse(parts[1])
-            target_host = url.hostname or ""
-            target_port = url.port or 80
+        # 根据域名解析上游
+        upstream_info = self._resolve_upstream(target_host)
 
+        if isinstance(upstream_info, _DirectType):
+            # 直连目标
+            upstream_reader, upstream_writer = await asyncio.open_connection(target_host, target_port)
+            # 改写请求行：绝对 URL → 相对路径
+            path = url.path or "/"
+            if url.query:
+                path += f"?{url.query}"
+            header_lines[0] = f"{parts[0]} {path} {parts[2]}\r\n".encode()
+        elif upstream_info.scheme in ("socks5", "socks5h", "socks4", "socks4a"):
+            # SOCKS 上游：通过 SOCKS 隧道直连目标
             upstream_reader, upstream_writer = await _connect_upstream(
-                proxy_info, target_host, target_port, self._transit_info
+                upstream_info, target_host, target_port, self._transit_info
             )
-
             # 改写请求行：绝对 URL → 相对路径
             path = url.path or "/"
             if url.query:
@@ -720,11 +789,10 @@ class _ProxyServer:
         else:
             # HTTP 上游：转发给上游代理（有中转时通过中转连接）
             upstream_reader, upstream_writer = await _open_connection(
-                proxy_info.host, proxy_info.port, self._transit_info
+                upstream_info.host, upstream_info.port, self._transit_info
             )
-
-            if proxy_info.username and proxy_info.password:
-                credentials = base64.b64encode(f"{proxy_info.username}:{proxy_info.password}".encode()).decode()
+            if upstream_info.username and upstream_info.password:
+                credentials = base64.b64encode(f"{upstream_info.username}:{upstream_info.password}".encode()).decode()
                 header_lines.insert(-1, f"Proxy-Authorization: Basic {credentials}\r\n".encode())
 
         # 给上游请求注入 Connection: close，确保上游响应完就关闭连接
@@ -790,6 +858,9 @@ class ProxyService:
         provider: 自定义代理提供者，与 proxies 二选一。
         strategy: 列表轮换策略，``"round_robin"`` 或 ``"random"``。
         transit: 中转代理地址，用于无法直连上游代理时先通过中转。
+        rules: 域名路由规则，按域名匹配不同代理。
+            键为域名模式（支持 ``*`` 通配符），值为代理地址字符串或 ``"direct"``（直连）。
+            未匹配的域名走 proxies/provider 提供的默认代理。
 
     用法::
 
@@ -801,6 +872,12 @@ class ProxyService:
 
         # 代理链（通过 Clash 中转访问海外代理）
         svc = ProxyService("socks5://overseas:port", transit="http://127.0.0.1:7897")
+
+        # 域名路由
+        svc = ProxyService("http://default:8080", rules={
+            "*.cn": "direct",
+            "*.google.com": "socks5://proxy1:1080",
+        })
     """
 
     def __init__(
@@ -810,6 +887,7 @@ class ProxyService:
         provider: ProxyProvider | None = None,
         strategy: str = "round_robin",
         transit: str | None = None,
+        rules: dict[str, str] | None = None,
     ):
         if provider:
             self._provider = provider
@@ -821,6 +899,16 @@ class ProxyService:
             raise ValueError("必须提供 proxies 或 provider 参数")
 
         self._transit_info = _parse_proxy(transit) if transit else None
+
+        # 解析域名路由规则
+        self._rules: list[tuple[str, _ProxyInfo | _DirectType]] = []
+        if rules:
+            for pattern, proxy_url in rules.items():
+                if proxy_url == "direct":
+                    self._rules.append((pattern, DIRECT))
+                else:
+                    self._rules.append((pattern, _parse_proxy(proxy_url)))
+
         self._server: _ProxyServer | None = None
         self._started = False
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -856,6 +944,7 @@ class ProxyService:
         proxy_info = _parse_proxy(proxy_url)
         self._server.set_upstream(proxy_info)
         self._server.set_transit(self._transit_info)
+        self._server.set_rules(self._rules)
 
     async def _async_init_upstream(self) -> None:
         """从 provider 异步获取代理并设置上游。"""
@@ -863,6 +952,7 @@ class ProxyService:
         proxy_info = _parse_proxy(proxy_url)
         self._server.set_upstream(proxy_info)
         self._server.set_transit(self._transit_info)
+        self._server.set_rules(self._rules)
 
     def switch(self) -> None:
         """切换到新代理（同步，调用 provider.get_proxy()）。"""
