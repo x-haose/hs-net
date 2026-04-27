@@ -813,7 +813,7 @@ wheels = [
 
 [[package]]
 name = "hs-net"
-version = "0.3.1"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
     { name = "httpx", extra = ["http2", "socks"] },
