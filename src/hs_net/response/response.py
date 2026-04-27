@@ -60,7 +60,7 @@ class Response:
         self.host: str = _parsed.hostname or ""
 
         self._text: str | None = None
-        self._json_data: dict | list | None = None
+        self._json_data: Any = None
         self._json_loaded: bool = False
         self._selector: Selector | None = None
 
@@ -93,7 +93,7 @@ class Response:
         return self._text
 
     @property
-    def json_data(self) -> dict | list | None:
+    def json_data(self) -> Any:
         """响应体解析后的 JSON 数据（懒加载，首次访问时解析）。
 
         Returns:
@@ -106,6 +106,22 @@ class Response:
             except (_json.JSONDecodeError, UnicodeDecodeError, ValueError):
                 self._json_data = None
         return self._json_data
+
+    @property
+    def json_dict(self) -> dict:
+        """返回 JSON dict，非 dict 时抛 TypeError。"""
+        data = self.json_data
+        if not isinstance(data, dict):
+            raise TypeError(f"期望 dict，实际为 {type(data).__name__}")
+        return data
+
+    @property
+    def json_list(self) -> list:
+        """返回 JSON list，非 list 时抛 TypeError。"""
+        data = self.json_data
+        if not isinstance(data, list):
+            raise TypeError(f"期望 list，实际为 {type(data).__name__}")
+        return data
 
     @property
     def selector(self) -> Selector:
