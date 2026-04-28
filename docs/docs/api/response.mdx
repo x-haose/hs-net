@@ -14,7 +14,9 @@
 | `client_cookies` | `dict[str, str]` | 会话级 cookies |
 | `content` | `bytes` | 响应体原始字节（构造函数唯一参数） |
 | `text` | `str` | 响应体文本（`@property`，从 `content` 按 Content-Type charset 解码，fallback utf-8，首次访问时计算） |
-| `json_data` | `dict \| list \| None` | JSON 数据（`@property`，从 `content` 首次访问时解析，解析失败为 None） |
+| `json_data` | `Any` | JSON 数据（`@property`，从 `content` 首次访问时解析，解析失败为 None） |
+| `json_dict` | `dict` | JSON dict（`@property`，非 dict 时抛 `TypeError`） |
+| `json_list` | `list` | JSON list（`@property`，非 list 时抛 `TypeError`） |
 | `request_data` | `RequestModel` | 原始请求信息 |
 | `domain` | `str` | 域名（含协议），如 `https://example.com` |
 | `host` | `str` | 主机名，如 `example.com` |
