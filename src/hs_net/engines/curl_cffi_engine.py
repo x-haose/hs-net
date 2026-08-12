@@ -17,8 +17,21 @@ from hs_net.exceptions import ConnectionException, EngineNotInstalled, StatusExc
 from hs_net.models import RequestModel
 from hs_net.response import Response
 from hs_net.response.stream import StreamResponse
+from hs_net.ua import DEFAULT_USER_AGENT
 
 from .base import EngineBase, SyncEngineBase, build_common_request_kwargs, build_response
+
+
+def build_curl_request_kwargs(request_data: RequestModel) -> dict:
+    """构建 curl-cffi 请求参数。
+
+    用户没有自定义 UA 时移除 User-Agent，交给 impersonate 提供 —— 它给出的 UA
+    与自身的 TLS 指纹、sec-ch-ua 等 client hints 同代，塞入外部 UA 反而会制造矛盾。
+    """
+    kwargs = build_common_request_kwargs(request_data)
+    if request_data.user_agent == DEFAULT_USER_AGENT:
+        kwargs["headers"] = {k: v for k, v in kwargs["headers"].items() if k.lower() != "user-agent"}
+    return kwargs
 
 
 class CurlCffiEngine(EngineBase):
@@ -51,7 +64,7 @@ class CurlCffiEngine(EngineBase):
             verify=self._verify,
             headers=self._default_headers,
             cookies=self._default_cookies,
-            impersonate=engine_options.get("impersonate", "chrome110"),
+            impersonate=engine_options.get("impersonate", "chrome"),
             http_version=engine_options.get("http_version", CurlHttpVersion.V2_0),
             proxy=proxy,
         )
@@ -84,7 +97,7 @@ class CurlCffiEngine(EngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            response = await self.client.request(**build_common_request_kwargs(request_data))
+            response = await self.client.request(**build_curl_request_kwargs(request_data))
             return build_response(
                 url=response.url,
                 status_code=response.status_code,
@@ -115,7 +128,7 @@ class CurlCffiEngine(EngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            kwargs = build_common_request_kwargs(request_data)
+            kwargs = build_curl_request_kwargs(request_data)
             kwargs["stream"] = True
             response = await self.client.request(**kwargs)
 
@@ -169,7 +182,7 @@ class SyncCurlCffiEngine(SyncEngineBase):
             verify=self._verify,
             headers=self._default_headers,
             cookies=self._default_cookies,
-            impersonate=engine_options.get("impersonate", "chrome110"),
+            impersonate=engine_options.get("impersonate", "chrome"),
             http_version=engine_options.get("http_version", CurlHttpVersion.V2_0),
             proxy=proxy,
         )
@@ -202,7 +215,7 @@ class SyncCurlCffiEngine(SyncEngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            response = self.client.request(**build_common_request_kwargs(request_data))
+            response = self.client.request(**build_curl_request_kwargs(request_data))
             return build_response(
                 url=response.url,
                 status_code=response.status_code,
@@ -233,7 +246,7 @@ class SyncCurlCffiEngine(SyncEngineBase):
             ConnectionException: 当连接失败时抛出。
         """
         try:
-            kwargs = build_common_request_kwargs(request_data)
+            kwargs = build_curl_request_kwargs(request_data)
             kwargs["stream"] = True
             response = self.client.request(**kwargs)
 

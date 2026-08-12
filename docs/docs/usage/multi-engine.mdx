@@ -62,13 +62,15 @@ net = SyncNet(engine="httpx", engine_options={"http2": False})
 net = SyncNet(
     engine="curl_cffi",
     engine_options={
-        "impersonate": "chrome120",   # 浏览器指纹
+        "impersonate": "chrome",   # 浏览器指纹
     },
 )
 ```
 
 :::info 支持的指纹
-curl-cffi 支持多种浏览器指纹：`chrome110`、`chrome120`、`safari15_5`、`edge101` 等。
+curl-cffi 支持多种浏览器指纹。推荐直接传 `chrome`、`firefox`、`safari`、`edge` 这类别名 —— 它们会自动解析到当前 curl-cffi 支持的最新版本；也可写死具体版本如 `chrome131`。
+
+不指定 `user_agent` 时，UA 由 impersonate 提供，与其 TLS 指纹、client hints 同代；显式指定 `user_agent` 会覆盖它，可能造成指纹矛盾。
 详见 [curl-cffi 文档](https://curl-cffi.readthedocs.io/)。
 :::
 

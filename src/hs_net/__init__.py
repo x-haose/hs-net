@@ -40,6 +40,7 @@ from hs_net.shortcuts import (
     sync_request,
 )
 from hs_net.sync_client import SyncNet
+from hs_net.ua import DEFAULT_USER_AGENT, UserAgentShortcut, user_agent_shortcuts
 
 __all__ = [
     "Net",
@@ -52,6 +53,9 @@ __all__ = [
     "ApiProxyProvider",
     "EngineEnum",
     "RequestModel",
+    "DEFAULT_USER_AGENT",
+    "UserAgentShortcut",
+    "user_agent_shortcuts",
     "Response",
     "StreamResponse",
     "Selector",

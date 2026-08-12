@@ -46,7 +46,7 @@ def preset_config():
         base_url="https://example.com",
         retries=5,
         user_agent="chrome",
-        engine_options={"impersonate": "chrome120"},
+        engine_options={"impersonate": "chrome"},
     )
 
     with SyncNet(config=my_config) as net:
