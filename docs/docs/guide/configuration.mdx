@@ -7,7 +7,7 @@ hs-net 提供灵活的配置方式，支持全局配置、构造函数参数和�
 `NetConfig` 是全局配置类，所有选项都有合理的默认值：
 
 ```python title="config.py"
-from hs_net import NetConfig, EngineEnum
+from hs_net import NetConfig, EngineEnum, DEFAULT_USER_AGENT
 
 config = NetConfig(
     engine=EngineEnum.HTTPX,    # HTTP 引擎
@@ -15,7 +15,7 @@ config = NetConfig(
     timeout=20.0,               # 超时时间（秒）
     retries=3,                  # 重试次数
     retry_delay=0.0,            # 重试间隔（秒）
-    user_agent="random",        # User-Agent
+    user_agent=DEFAULT_USER_AGENT,  # User-Agent，默认当前版桌面 Chrome
     proxy=None,                 # 代理地址（支持字符串或 ProxyService）
     verify=False,               # SSL 证书验证（默认关闭）
     raise_status=True,          # 非 2xx 是否抛异常
@@ -62,16 +62,29 @@ net.get("https://other.com/path")  # => https://other.com/path
 
 ### user_agent
 
-支持快捷方式和自定义字符串：
+默认是当前版本的桌面 Chrome，无需配置。要换用内置的真实 UA 池，传快捷方式即可（不区分大小写）：
 
 ```python
-net = SyncNet(user_agent="random")     # 每次请求随机 UA
-net = SyncNet(user_agent="chrome")     # Chrome UA
-net = SyncNet(user_agent="firefox")    # Firefox UA
-net = SyncNet(user_agent="safari")     # Safari UA
-net = SyncNet(user_agent="edge")       # Edge UA
-net = SyncNet(user_agent="MyBot/1.0") # 自定义 UA
+net = SyncNet(user_agent="random")      # 任意桌面浏览器
+net = SyncNet(user_agent="chrome")      # 指定浏览器
+net = SyncNet(user_agent="mobile")      # 任意移动端浏览器
+net = SyncNet(user_agent="android")     # 指定移动平台
+net = SyncNet(user_agent="bot")         # 任意搜索引擎爬虫
+net = SyncNet(user_agent="baiduspider") # 指定爬虫
+net = SyncNet(user_agent="wechat")      # 微信内置浏览器
+net = SyncNet(user_agent="MyBot/1.0")   # 自定义 UA，原样使用
 ```
+
+| 类别 | 快捷方式 |
+|------|----------|
+| 桌面浏览器 | `random`、`chrome`、`firefox`（`ff`）、`edge`、`safari` |
+| 移动端浏览器 | `mobile`、`android`、`ios`（`iphone`） |
+| 搜索引擎爬虫 | `bot`、`googlebot`（`google`）、`bingbot`（`bing`）、`baiduspider`（`baidu`）、`sogou`、`360spider`、`bytespider`（`bytedance`/`toutiao`）、`yandexbot`（`yandex`）、`duckduckbot`、`applebot` |
+| App 内置浏览器 | `wechat`（`weixin`/`micromessenger`） |
+
+`random` 和 `mobile` 是桌面、移动端各自的随机入口。爬虫和微信有特定用途，需要显式指定，不会被随机取到。不在上表中的字符串一律当作自定义 UA 使用。
+
+UA 数据内置在包里（约 13 KB，无额外依赖），由 `scripts/gen_ua_data.py` 从上游源合并生成，刷新只需重跑该脚本。
 
 ### verify
 
@@ -130,7 +143,7 @@ net = SyncNet(engine="httpx", engine_options={"http2": False})
 
 # curl_cffi: 自定义浏览器指纹
 net = SyncNet(engine="curl_cffi", engine_options={
-    "impersonate": "chrome120",
+    "impersonate": "chrome",
 })
 ```
 
@@ -175,7 +188,7 @@ with SyncNet(config=config, headers={"X-Instance": "2"}) as net:
 `NetConfig` 使用 `frozen=True`（不可变），不支持继承覆盖。如需团队统一配置，直接实例化即可：
 
 ```python title="team_config.py"
-from hs_net import NetConfig, EngineEnum, Net, SyncNet
+from hs_net import NetConfig, EngineEnum, DEFAULT_USER_AGENT, Net, SyncNet
 
 # 团队统一配置
 my_config = NetConfig(

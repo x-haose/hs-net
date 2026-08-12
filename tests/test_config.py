@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hs_net.config import NetConfig
 from hs_net.models import EngineEnum
+from hs_net.ua import DEFAULT_USER_AGENT
 
 
 class TestNetConfig:
@@ -16,7 +17,7 @@ class TestNetConfig:
         assert cfg.timeout == 20.0
         assert cfg.retries == 3
         assert cfg.retry_delay == 0.0
-        assert cfg.user_agent == "random"
+        assert cfg.user_agent == DEFAULT_USER_AGENT
         assert cfg.proxy is None
         assert cfg.verify is False
         assert cfg.raise_status is True

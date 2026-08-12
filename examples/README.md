@@ -20,7 +20,7 @@
 # 核心功能
 pip install hs-net
 
-# 爬虫增强（CSS/XPath + JMESPath + 随机 UA）
+# 爬虫增强（CSS/XPath + JMESPath + 速率限制）
 pip install hs-net[sp]
 
 # 全部引擎 + 爬虫功能

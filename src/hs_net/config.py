@@ -5,6 +5,7 @@ from typing import Any
 
 from hs_net.models import EngineEnum
 from hs_net.rate_limit import RateLimitConfig
+from hs_net.ua import DEFAULT_USER_AGENT
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,8 @@ class NetConfig:
         timeout: 请求超时时间（秒）。
         retries: 请求失败后的重试次数。
         retry_delay: 重试间隔时间（秒），为 0 则立即重试。
-        user_agent: User-Agent 配置，支持 "random"、"chrome" 等快捷方式。
+        user_agent: User-Agent 配置，默认桌面 Chrome，支持 "random"、"chrome"、"firefox"、
+            "edge"、"safari" 等快捷方式从内置 UA 池随机取。
         proxy: 全局代理，支持字符串、列表、ProxyService。
         verify: 是否验证 SSL 证书，默认关闭。
         raise_status: 状态码非 2xx 时是否抛出异常。
@@ -43,7 +45,7 @@ class NetConfig:
     timeout: float = 20.0
     retries: int = 3
     retry_delay: float = 0.0
-    user_agent: str = "random"
+    user_agent: str = DEFAULT_USER_AGENT
     proxy: str | Any | None = None  # str, ProxyService, or None
     verify: bool = False
     raise_status: bool = True

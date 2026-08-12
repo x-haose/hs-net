@@ -642,15 +642,6 @@ wheels = [
 ]
 
 [[package]]
-name = "fake-useragent"
-version = "2.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/41/43/948d10bf42735709edb5ae51e23297d034086f17fc7279fef385a7acb473/fake_useragent-2.2.0.tar.gz", hash = "sha256:4e6ab6571e40cc086d788523cf9e018f618d07f9050f822ff409a4dfe17c16b2", size = 158898 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/51/37/b3ea9cd5558ff4cb51957caca2193981c6b0ff30bd0d2630ac62505d99d0/fake_useragent-2.2.0-py3-none-any.whl", hash = "sha256:67f35ca4d847b0d298187443aaf020413746e56acd985a611908c73dba2daa24", size = 161695 },
-]
-
-[[package]]
 name = "filelock"
 version = "3.25.1"
 source = { registry = "https://pypi.org/simple" }
@@ -813,7 +804,7 @@ wheels = [
 
 [[package]]
 name = "hs-net"
-version = "0.3.2"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx", extra = ["http2", "socks"] },
@@ -827,7 +818,6 @@ aiohttp = [
 all = [
     { name = "aiohttp" },
     { name = "curl-cffi" },
-    { name = "fake-useragent" },
     { name = "jmespath" },
     { name = "parsel" },
     { name = "pyrate-limiter" },
@@ -844,7 +834,6 @@ requests-go = [
     { name = "requests-go" },
 ]
 sp = [
-    { name = "fake-useragent" },
     { name = "jmespath" },
     { name = "parsel" },
     { name = "pyrate-limiter" },
@@ -868,7 +857,6 @@ requires-dist = [
     { name = "aiohttp", marker = "extra == 'all'", specifier = ">=3.9" },
     { name = "curl-cffi", marker = "extra == 'all'", specifier = ">=0.7" },
     { name = "curl-cffi", marker = "extra == 'curl'", specifier = ">=0.7" },
-    { name = "fake-useragent", marker = "extra == 'sp'", specifier = ">=1.5" },
     { name = "hs-net", extras = ["sp"], marker = "extra == 'all'" },
     { name = "httpx", extras = ["http2", "socks"], specifier = ">=0.28" },
     { name = "jmespath", marker = "extra == 'sp'", specifier = ">=1.1.0" },

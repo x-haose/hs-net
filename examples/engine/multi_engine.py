@@ -42,7 +42,7 @@ def sync_engines():
     with SyncNet(
         engine=EngineEnum.CURL_CFFI,
         retries=0,
-        engine_options={"impersonate": "chrome120"},
+        engine_options={"impersonate": "chrome"},
     ) as net:
         resp = net.get(TEST_URL)
         print(f"curl_cffi:    {resp.status_code}")
@@ -97,7 +97,7 @@ def engine_options_example():
     with SyncNet(
         engine=EngineEnum.CURL_CFFI,
         retries=0,
-        engine_options={"impersonate": "safari15_5"},
+        engine_options={"impersonate": "safari"},
     ) as net:
         resp = net.get(TEST_URL)
         print(f"curl_cffi (Safari): {resp.status_code}")

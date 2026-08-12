@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 from hs_net.config import NetConfig
 from hs_net.models import RequestModel
-from hs_net.ua import resolve_user_agent
+from hs_net.ua import UserAgentShortcut, resolve_user_agent
 
 
 def build_request(
@@ -19,7 +19,7 @@ def build_request(
     json_data: dict = None,
     form_data: dict[str, Any] | list[tuple[str, str]] | str | bytes | None = None,
     files: dict[str, Any] | list[tuple] | None = None,
-    user_agent: str = None,
+    user_agent: UserAgentShortcut | str = None,
     headers: dict = None,
     cookies: dict = None,
     timeout: float = None,
@@ -58,9 +58,13 @@ def build_request(
         path = url if url.startswith("/") else f"/{url}"
         url = f"{base}{path}"
 
-    ua = resolve_user_agent(user_agent or cfg.user_agent)
     req_headers = {**cfg.headers, **(headers or {})}
+    # headers 里显式写的 User-Agent 优先于 cfg.user_agent 默认值（否则会被随机 UA 覆盖）
+    ua_key = next((k for k in req_headers if k.lower() == "user-agent"), None)
+    ua = resolve_user_agent(user_agent or (req_headers.get(ua_key) if ua_key else None) or cfg.user_agent)
     if ua:
+        if ua_key and ua_key != "User-Agent":
+            del req_headers[ua_key]
         req_headers["User-Agent"] = ua
 
     # form 编码处理（不和 files 冲突）

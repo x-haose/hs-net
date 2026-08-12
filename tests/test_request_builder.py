@@ -70,6 +70,31 @@ class TestBuildRequest:
         req = build_request(cfg, url="https://x.com", method="GET", user_agent="MyBot/1.0")
         assert req.headers["User-Agent"] == "MyBot/1.0"
 
+    def test_default_user_agent_is_stable_and_desktop(self):
+        cfg = NetConfig()
+        uas = {build_request(cfg, url="https://x.com", method="GET").headers["User-Agent"] for _ in range(5)}
+        assert len(uas) == 1, "默认 UA 必须实例内稳定，不能每次请求都变"
+        ua = uas.pop()
+        assert "Chrome/" in ua
+        assert "Mobile" not in ua and "Android" not in ua and "iPhone" not in ua
+
+    def test_config_headers_user_agent_not_overridden(self):
+        cfg = NetConfig(headers={"User-Agent": "MyBot/1.0"})
+        req = build_request(cfg, url="https://x.com", method="GET")
+        assert req.headers["User-Agent"] == "MyBot/1.0"
+        assert req.user_agent == "MyBot/1.0"
+
+    def test_request_headers_user_agent_case_insensitive(self):
+        cfg = NetConfig(user_agent="chrome")
+        req = build_request(cfg, url="https://x.com", method="GET", headers={"user-agent": "MyBot/1.0"})
+        assert req.headers["User-Agent"] == "MyBot/1.0"
+        assert "user-agent" not in req.headers
+
+    def test_user_agent_param_beats_headers(self):
+        cfg = NetConfig(headers={"User-Agent": "FromHeaders/1.0"})
+        req = build_request(cfg, url="https://x.com", method="GET", user_agent="MyBot/1.0")
+        assert req.headers["User-Agent"] == "MyBot/1.0"
+
     def test_form_data_dict_encoded(self):
         cfg = NetConfig()
         req = build_request(cfg, url="https://x.com", method="POST", form_data={"a": "1", "b": "2"})

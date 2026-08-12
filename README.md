@@ -11,7 +11,7 @@
 - **自动重试** — 基于 tenacity，可配置次数、间隔、随机抖动
 - **信号中间件** — 请求前、响应后、重试时三个钩子
 - **统一异常** — 超时、连接失败、状态码错误等统一映射，切换引擎不影响错误处理
-- **反爬支持** — curl-cffi 浏览器 TLS 指纹模拟 + 随机 User-Agent
+- **反爬支持** — curl-cffi 浏览器 TLS 指纹模拟 + 内置真实 User-Agent 池（浏览器 / 搜索引擎爬虫 / 微信）
 - **轻量核心** — 核心仅依赖 httpx + tenacity，爬虫增强按需安装
 
 ## 安装
@@ -20,7 +20,7 @@
 # 核心安装（默认 httpx 引擎，仅 2 个依赖）
 pip install hs-net
 
-# 爬虫增强（CSS/XPath 选择器 + JMESPath + 随机 UA）
+# 爬虫增强（CSS/XPath 选择器 + JMESPath + 速率限制）
 pip install hs-net[sp]
 
 # 按需安装额外引擎
@@ -31,7 +31,7 @@ pip install hs-net[requests-go]  # requests-go 引擎
 pip install hs-net[all]          # 全部引擎 + 爬虫增强
 ```
 
-> Python >= 3.10。默认安装仅包含 httpx + tenacity，选择器和随机 UA 需安装 `[sp]`。
+> Python >= 3.10。默认安装仅包含 httpx + tenacity，选择器需安装 `[sp]`。User-Agent 池是内置的，无需额外依赖。
 
 ## 快速开始
 
@@ -96,7 +96,7 @@ Net(engine="httpx")
 Net(engine="aiohttp")
 
 # curl-cffi（支持浏览器指纹模拟）
-Net(engine="curl_cffi", engine_options={"impersonate": "chrome120"})
+Net(engine="curl_cffi", engine_options={"impersonate": "chrome"})
 
 # requests（仅同步）
 SyncNet(engine="requests")
@@ -171,7 +171,7 @@ config = NetConfig(
     retries=3,
     user_agent="random",
     headers={"Authorization": "Bearer token"},
-    engine_options={"impersonate": "chrome120"},
+    engine_options={"impersonate": "chrome"},
 )
 net = Net(config=config)
 ```
@@ -206,6 +206,46 @@ async with Net(timeout=10, retries=3) as net:
 ```
 
 参数优先级：`请求方法参数 > 构造函数参数 > NetConfig 默认值`
+
+## User-Agent
+
+默认就是当前版本的桌面 Chrome，不用配置。要换用内置的真实 UA 池，传快捷方式即可（不区分大小写）：
+
+```python
+Net(user_agent="random")       # 任意桌面浏览器
+Net(user_agent="chrome")       # 指定浏览器：chrome / firefox / edge / safari
+Net(user_agent="mobile")       # 任意移动端浏览器
+Net(user_agent="android")      # 指定平台：android / ios
+Net(user_agent="bot")          # 任意搜索引擎爬虫
+Net(user_agent="baiduspider")  # 指定爬虫，见下表
+Net(user_agent="wechat")       # 微信内置浏览器
+Net(user_agent="MyBot/1.0")    # 完整字符串则原样使用
+```
+
+| 类别 | 快捷方式 |
+|------|----------|
+| 桌面浏览器 | `random`、`chrome`、`firefox`（`ff`）、`edge`、`safari` |
+| 移动端浏览器 | `mobile`、`android`、`ios`（`iphone`） |
+| 搜索引擎爬虫 | `bot`、`googlebot`（`google`）、`bingbot`（`bing`）、`baiduspider`（`baidu`）、`sogou`、`360spider`、`bytespider`（`bytedance`/`toutiao`）、`yandexbot`（`yandex`）、`duckduckbot`、`applebot` |
+| App 内置浏览器 | `wechat`（`weixin`/`micromessenger`） |
+
+`random` 和 `mobile` 是桌面、移动端各自的随机入口。爬虫和微信有特定用途，需要显式指定，不会被随机取到。不在上表中的字符串一律当作自定义 UA 使用。
+
+```python
+from hs_net import DEFAULT_USER_AGENT, user_agent_shortcuts
+
+DEFAULT_USER_AGENT      # 当前默认 UA
+user_agent_shortcuts()  # 列出全部快捷方式（含别名）
+```
+
+UA 数据内置在包里（约 13 KB，无额外依赖），由 `scripts/gen_ua_data.py` 从四个上游源合并生成：
+
+| 来源 | 提供 |
+|------|------|
+| [jnrbsn/user-agents](https://github.com/jnrbsn/user-agents) | 各浏览器最新版本，日更 |
+| [microlinkhq/top-user-agents](https://github.com/microlinkhq/top-user-agents) | 真实流量最常用的 100 条，日更 |
+| [monperrus/crawler-user-agents](https://github.com/monperrus/crawler-user-agents) | 搜索引擎爬虫，含中文生态 |
+| App Store lookup API | 微信当前版本号 |
 
 ## 信号中间件
 

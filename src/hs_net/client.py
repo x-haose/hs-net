@@ -19,6 +19,7 @@ from hs_net.rate_limit import RateLimitConfig, RateLimitManager
 from hs_net.response import Response
 from hs_net.response.stream import StreamResponse
 from hs_net.signals import SignalManager
+from hs_net.ua import UserAgentShortcut
 
 logger = logging.getLogger("hs_net")
 
@@ -107,7 +108,7 @@ class Net:
         timeout: float = None,
         retries: int = None,
         retry_delay: float = None,
-        user_agent: str = None,
+        user_agent: UserAgentShortcut | str = None,
         proxy: str | ProxyService = None,
         verify: bool = None,
         raise_status: bool = None,
@@ -310,7 +311,7 @@ class Net:
         json_data: dict = None,
         form_data: dict[str, Any] | list[tuple[str, str]] | str | bytes | None = None,
         files: dict[str, Any] | list[tuple] | None = None,
-        user_agent: str = None,
+        user_agent: UserAgentShortcut | str = None,
         headers: dict = None,
         cookies: dict = None,
         timeout: float = None,
@@ -391,7 +392,7 @@ class Net:
         json_data: dict = None,
         form_data: dict[str, Any] | list[tuple[str, str]] | str | bytes | None = None,
         files: dict[str, Any] | list[tuple] | None = None,
-        user_agent: str = None,
+        user_agent: UserAgentShortcut | str = None,
         headers: dict = None,
         cookies: dict = None,
         timeout: float = None,
