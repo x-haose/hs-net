@@ -86,5 +86,9 @@ jobs:
         with:
           tag_name: "v${{ steps.version.outputs.version }}"
           name: "v${{ steps.version.outputs.version }}"
-          files: release-dist/*
+          # 只上传分发包 —— uv build 会在输出目录生成 .gitignore，
+          # 用 release-dist/* 通配会把它一起传成 default.gitignore 资产
+          files: |
+            release-dist/*.whl
+            release-dist/*.tar.gz
           body: ${{ steps.changelog.outputs.content }}
